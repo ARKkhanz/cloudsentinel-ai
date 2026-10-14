@@ -7,9 +7,10 @@ export const App: React.FC = () => {
   const [metricsData, setMetricsData] = useState<MetricListResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isStale, setIsStale] = useState<boolean>(false);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
 
-  // Central data loader fetching health status and recent synthetic metrics
+  // Central data loader fetching health status and reproducible synthetic metrics
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -21,12 +22,15 @@ export const App: React.FC = () => {
       ]);
       setHealth(healthRes);
       setMetricsData(metricsRes);
+      setIsStale(false);
       setLastFetched(new Date());
     } catch (err: unknown) {
       const errorMessage =
         err instanceof Error ? err.message : 'Unknown error connecting to backend.';
       setError(errorMessage);
       setHealth(null);
+      // Mark existing data as stale so it is never presented as current
+      setIsStale(true);
     } finally {
       setIsLoading(false);
     }
@@ -138,12 +142,21 @@ export const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Error State Banner */}
+      {/* Error State Banner / Stale Notice */}
       {error && (
         <div className="error-banner" role="alert">
           <div>
-            <div className="error-title">Backend Connection Error</div>
-            <div className="error-message">{error}</div>
+            <div className="error-title">
+              {isStale && sampleCount > 0
+                ? 'Backend Connection Lost — Displaying Stale Cached Telemetry'
+                : 'Backend Connection Error'}
+            </div>
+            <div className="error-message">
+              {error}
+              {isStale && sampleCount > 0 && lastFetched && (
+                <> (Cached data from {lastFetched.toLocaleTimeString()} is retained for reference, but is stale.)</>
+              )}
+            </div>
           </div>
           <button className="btn btn-retry" onClick={loadData}>
             Retry Connection
@@ -157,26 +170,34 @@ export const App: React.FC = () => {
           <span className="card-title">Monitored Service</span>
           <span className="card-value">{metricsData?.service || 'demo-api'}</span>
           <span className="card-footer">
-            {sampleCount > 0 ? `${sampleCount} samples (${metricsData?.order})` : 'Awaiting data'}
+            {sampleCount > 0
+              ? `${sampleCount} samples (${metricsData?.order})${isStale ? ' [STALE]' : ''}`
+              : 'Awaiting data'}
           </span>
         </div>
 
         <div className="metric-card">
           <span className="card-title">Average Latency</span>
           <span className="card-value">{avgLatency} ms</span>
-          <span className="card-footer">Baseline round-trip response</span>
+          <span className="card-footer">
+            {isStale ? 'Stale cached response' : 'Baseline round-trip response'}
+          </span>
         </div>
 
         <div className="metric-card">
           <span className="card-title">Average Error Rate</span>
           <span className="card-value">{avgErrorRate}%</span>
-          <span className="card-footer">Proportion of failed requests</span>
+          <span className="card-footer">
+            {isStale ? 'Stale cached error proportion' : 'Proportion of failed requests'}
+          </span>
         </div>
 
         <div className="metric-card">
           <span className="card-title">Total Requests</span>
           <span className="card-value">{totalRequests}</span>
-          <span className="card-footer">Observed window volume</span>
+          <span className="card-footer">
+            {isStale ? 'Stale window volume' : 'Observed window volume'}
+          </span>
         </div>
 
         <div className="metric-card">
@@ -184,7 +205,9 @@ export const App: React.FC = () => {
           <span className="card-value">
             {avgCpu}% / {avgMemory}%
           </span>
-          <span className="card-footer">Synthetic resource load</span>
+          <span className="card-footer">
+            {isStale ? 'Stale resource load' : 'Synthetic resource load'}
+          </span>
         </div>
       </section>
 
@@ -192,10 +215,25 @@ export const App: React.FC = () => {
       <section className="section-panel">
         <div className="panel-header">
           <div>
-            <h2 className="panel-title">Recent Telemetry Observations</h2>
+            <h2 className="panel-title">
+              Recent Telemetry Observations
+              {isStale && sampleCount > 0 && (
+                <span
+                  className="badge badge-synthetic"
+                  style={{
+                    backgroundColor: '#7f1d1d',
+                    borderColor: '#ef4444',
+                    color: '#fecaca',
+                    marginLeft: '0.75rem',
+                  }}
+                >
+                  STALE CACHED DATA
+                </span>
+              )}
+            </h2>
             {lastFetched && (
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                Last fetched: {lastFetched.toLocaleTimeString()}
+                Last fetched: {lastFetched.toLocaleTimeString()} {isStale ? '(backend disconnected)' : ''}
               </span>
             )}
           </div>
@@ -224,7 +262,7 @@ export const App: React.FC = () => {
                 <tr>
                   <td colSpan={8} className="state-box">
                     <span className="spinner" style={{ marginRight: '0.5rem' }}></span>
-                    Loading real-time telemetry from FastAPI backend...
+                    Loading synthetic telemetry from FastAPI backend...
                   </td>
                 </tr>
               )}

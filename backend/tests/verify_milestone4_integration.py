@@ -1,3 +1,10 @@
+"""
+Backend HTTP Lifecycle & Network Integration Verification.
+
+NOTE: This script tests the backend ASGI HTTP lifecycle, network socket connectivity,
+CORS header negotiation, and response schemas over live HTTP requests.
+It does NOT execute or verify the React browser DOM/UI layer.
+"""
 import json
 import subprocess
 import sys
@@ -7,7 +14,8 @@ import urllib.error
 
 
 def verify_integration():
-    print("=== Milestone 4: End-to-End Integration Verification ===")
+    print("=== Backend HTTP Process Lifecycle & Socket Verification ===")
+    print("(Testing live FastAPI server, network responses & CORS - Not React DOM)")
     
     # 1. Start FastAPI backend on 127.0.0.1:8000
     print("\n1. Starting FastAPI backend...")
