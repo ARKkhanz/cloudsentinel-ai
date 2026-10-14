@@ -1,0 +1,56 @@
+# CloudSentinel AI — Multi-Container Orchestration Specification
+# Modern Docker Compose specification (no obsolete version field)
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: cloudsentinel-backend
+    restart: unless-stopped
+    environment:
+      # Persistent SQLite database path within the mounted named volume
+      DATABASE_URL: "sqlite:////app/backend/data/cloudsentinel.db"
+      # Allowed origins for direct backend access (including host loopback and dev server)
+      ALLOWED_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173"
+      DEBUG: "False"
+    volumes:
+      # Named volume for persistent SQLite storage surviving container recreation
+      - cloudsentinel-data:/app/backend/data
+    ports:
+      # Published to host loopback only for direct Swagger/OpenAPI documentation access
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health').getcode() == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - cloudsentinel-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        # Build-time Vite base URL set to empty string for same-origin proxying via Nginx
+        VITE_API_BASE_URL: ""
+    container_name: cloudsentinel-frontend
+    restart: unless-stopped
+    ports:
+      # Published to host loopback only for primary dashboard access
+      - "127.0.0.1:3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - cloudsentinel-network
+
+networks:
+  cloudsentinel-network:
+    driver: bridge
+
+volumes:
+  cloudsentinel-data:
+    driver: local

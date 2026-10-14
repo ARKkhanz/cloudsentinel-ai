@@ -22,7 +22,11 @@ Developed as a four-day engineering project following the *CloudSentinel AI Impl
   - [x] **Milestone 4**: Multivariate `IsolationForest` anomaly detector with Scikit-Learn
   - [x] **Milestone 5**: Incident generation, evidence preservation, deduplication, FastAPI APIs, and React dashboard integration
   - [x] **Milestone 6**: Reproducible ML evaluation, reliability hardening (schema migration logging & SHA-256 fingerprint deduplication), comprehensive documentation, and final Day 2 verification
-- **Day 3: Quality, Docker & GitHub Actions CI** *(Planned)*
+- **Day 3: Quality, Docker & GitHub Actions CI**
+  - [x] **Milestone 1**: Engineering quality, dependency hygiene, ESLint 10, and security review
+  - [x] **Milestone 2**: Secure backend and frontend Dockerfiles + production Nginx configuration
+  - [x] **Milestone 3**: Docker Compose multi-container orchestration, networking, and SQLite volume persistence
+  - [ ] **Milestone 4**: GitHub Actions automated CI workflow *(Planned)*
 - **Day 4: End-to-End Verification, Documentation & Demo** *(Planned)*
 
 ---
@@ -281,6 +285,31 @@ python backend/tests/milestone6_browser_qa.py
 * IsolationForest Evidence Modal: [`docs/screenshots/milestone6_06_ml_evidence_modal.png`](docs/screenshots/milestone6_06_ml_evidence_modal.png)
 * Persisted Across Reload: [`docs/screenshots/milestone6_07_persisted_after_reload.png`](docs/screenshots/milestone6_07_persisted_after_reload.png)
 * Mobile Responsive Viewport: [`docs/screenshots/milestone6_08_mobile_responsive.png`](docs/screenshots/milestone6_08_mobile_responsive.png)
+
+---
+
+## Container Orchestration (Docker Compose)
+
+CloudSentinel AI supports multi-container orchestration via root-level `compose.yaml`:
+
+```bash
+# Build images and start services in detached mode
+docker compose up --build -d
+
+# Verify service health and port mappings
+docker compose ps
+
+# Access services:
+# React Dashboard:    http://localhost:3000
+# Backend Health:     http://localhost:3000/health (proxied via Nginx)
+# Backend Swagger:    http://localhost:8000/docs   (direct loopback)
+
+# Stop services preserving SQLite volume data
+docker compose down
+```
+
+> [!NOTE]
+> Detailed container architecture, volume lifecycle, and verification matrices are documented in [`docs/milestone-3-orchestration.md`](docs/milestone-3-orchestration.md).
 
 ---
 
