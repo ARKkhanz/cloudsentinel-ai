@@ -29,7 +29,7 @@ CloudSentinel AI establishes an evidence-backed incident workflow:
               │
               ▼
     [Incident Conversion & Deduplication Engine]
-        Computes deterministic key: f"{service}:{detector_name}:{obs_timestamp_utc_iso}"
+        Computes deterministic key: f"{service}:{detector_name}:{sha256[:32]}"
         Filters previously recorded findings to prevent duplicate alert noise
               │
               ▼
@@ -217,8 +217,9 @@ Empirical evaluation demonstrated key operational trade-offs:
    - When operational rules are tuned to target known, severe univariate shocks, threshold rules achieve perfect precision and recall with zero training cost.
 2. **IsolationForest ($F_1 = 0.80$)**:
    - Successfully isolated 4 of 5 ground-truth anomalies in 5-dimensional subspace without access to labels or business rules.
-   - **False Positive (Index 28)**: Flagged an observation with unusually low latency (31.88ms) and high request count (152). While operationally healthy, this rare coordinate combination fell into a sparse subspace.
-   - **Contamination is an Assumption, Not Ground Truth**: Setting `contamination=0.05` enforces an arbitrary outlier budget of 5 samples. It does not reflect empirical reality.
+   - **False Positive (Index 28)**: Flagged an observation with unusually low latency (31.88ms) and high request count (152). While operationally healthy, this rare coordinate combination fell into a sparse subspace, receiving a decision score of `-0.0054` (below the training-derived `offset_`).
+   - **Contamination is an Assumption, Not Ground Truth**: Setting `contamination=0.05` sets the decision threshold (`offset_`) based on the 5th percentile of anomaly scores on the training data. It does not enforce an arbitrary budget or quota of 5 samples on unseen evaluation data, nor does it reflect empirical anomaly prevalence in production.
+   - **No Per-Feature Causal Attribution**: IsolationForest isolates samples via randomized orthogonal cuts across all 5 features. It outputs a scalar outlier score for the feature vector as a whole, but provides no per-feature causal explanation or root cause diagnosis.
    - **Anomaly Score is NOT Outage Probability**: A negative decision score (e.g. $-0.0373$) indicates geometric isolation path length, not a probability of service failure.
 
 ---

@@ -6,7 +6,7 @@ This document reports the reproducible benchmark and empirical evaluation of Clo
 1. **Threshold Baseline Detector** (`ThresholdDetector`) — A transparent, deterministic rule-based statistical threshold engine.
 2. **IsolationForest Multivariate Detector** (`IsolationForestDetector`) — An unsupervised machine learning ensemble utilizing random axis-aligned feature space partitioning.
 
-The evaluation was executed using the repository's standalone reproducible benchmark script ([`evaluate_detectors.py`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/backend/scripts/evaluate_detectors.py)) against held-out synthetic telemetry with mathematically decoupled ground-truth labels.
+The evaluation was executed using the repository's standalone reproducible benchmark script ([`evaluate_detectors.py`](../backend/scripts/evaluate_detectors.py)) against held-out synthetic telemetry with mathematically decoupled ground-truth labels.
 
 ---
 
@@ -47,7 +47,7 @@ To avoid data snooping, target leakage, and circular evaluation, training and ev
   - Timestamps (`timestamp`)
 
 ### 3.3 Feature Matrix Definition
-The multivariate feature vector $\mathbf{x} \in \mathbb{R}^5$ uses the canonical, immutable feature order defined in [`FEATURE_NAMES`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/backend/app/detection/isolation_forest_detector.py):
+The multivariate feature vector $\mathbf{x} \in \mathbb{R}^5$ uses the canonical, immutable feature order defined in [`FEATURE_NAMES`](../backend/app/detection/isolation_forest_detector.py):
 1. `latency_ms` (float, ms)
 2. `error_rate` (float, proportion [0.0, 1.0])
 3. `cpu_usage_pct` (float, [0.0, 100.0])
@@ -67,7 +67,13 @@ The multivariate feature vector $\mathbf{x} \in \mathbb{R}^5$ uses the canonical
 - **Implementation**: `sklearn.ensemble.IsolationForest`
 - **Random Seed**: `random_state = 42`
 - **Estimators**: `n_estimators = 100` trees
-- **Contamination Prior**: `contamination = 0.05` (assumes top 5% most isolated samples are outliers)
+- **Contamination Hyperparameter**: `contamination = 0.05`
+  - *Mechanism*: During fitting on clean baseline data, Scikit-Learn computes the decision boundary offset:
+    $$\text{offset\_} = \text{percentile}(\text{score\_samples}(X_{\text{train}}), 100 \times \text{contamination}) \approx -0.5591$$
+  - *Inference Rule*: For any evaluation sample $x$, the decision function is:
+    $$\text{decision\_function}(x) = \text{score\_samples}(x) - \text{offset\_}$$
+    An observation is classified as an anomaly ($-1$) if $\text{decision\_function}(x) < 0$.
+  - *Important*: Contamination defines the decision threshold based on the *training distribution*; it does **not** force or guarantee that exactly 5% of unseen evaluation samples will be flagged. An unseen evaluation set may yield fewer or more anomalies depending on where evaluation samples fall relative to $\text{offset\_}$.
 - **Fitting Data**: 100 samples from clean reference baseline (Seed `100`).
 
 ---
@@ -113,12 +119,12 @@ $$\begin{pmatrix} \text{TN}=94 & \text{FP}=1 \\ \text{FN}=1 & \text{TP}=4 \end{p
 
 ### 6.1 Ground-Truth Anomaly Instances
 | Index | UTC Timestamp | Anomaly Type | Injected Value | Baseline Mean | Detected By Threshold? | Detected By IsolationForest? |
-| :--- | :--- | :--- | :--- | :--- | :---: | :---: |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **13** | 2026-10-14 11:47:00 | `latency_spike` | 333.24 ms | 42.0 ms | **YES (TP)** | **YES (TP)** (score: -0.0364) |
 | **24** | 2026-10-14 11:36:00 | `latency_spike` | 503.70 ms | 42.0 ms | **YES (TP)** | **YES (TP)** (score: -0.0445) |
 | **40** | 2026-10-14 11:20:00 | `error_rate_spike` | 24.63% | 0.5% | **YES (TP)** | **YES (TP)** (score: -0.0373) |
 | **43** | 2026-10-14 11:17:00 | `error_rate_spike` | 16.17% | 0.5% | **YES (TP)** | **YES (TP)** (score: -0.0011) |
-| **45** | 2026-10-14 11:15:00 | `latency_spike` | 421.57 ms | 42.0 ms | **YES (TP)** | **NO (FN)** (ranked 6th) |
+| **45** | 2026-10-14 11:15:00 | `latency_spike` | 421.57 ms | 42.0 ms | **YES (TP)** | **NO (FN)** (score: +0.0053) |
 
 ### 6.2 Analysis of IsolationForest False Positive (Index 28)
 - **Observed Metrics**:
@@ -127,19 +133,20 @@ $$\begin{pmatrix} \text{TN}=94 & \text{FP}=1 \\ \text{FN}=1 & \text{TP}=4 \end{p
   - `request_count`: 152.0 (baseline $\mu=130.0$)
   - `cpu_usage_pct`: 25.46% (baseline $\mu=28.0\%$)
   - `memory_usage_pct`: 42.83% (baseline $\mu=44.0\%$)
-- **Anomaly Score**: `-0.0054`
-- **Root Rationale**:
-  In single-metric domain logic, Sample 28 represents healthy performance (exceptionally low latency and minimal error rate). However, IsolationForest does not evaluate operational semantics; it evaluates geometric isolation density in 5-dimensional space. The co-occurrence of unusually low latency (31.88ms) with elevated request volume (152) placed Sample 28 in a sparsely populated subspace, causing trees to isolate it quickly. Because `contamination=0.05` forces the model to flag the top 5% outliers, Sample 28 was classified as an anomaly.
+- **Decision Score**: `-0.0054` (4th lowest in evaluation set)
+- **Mathematical Rationale**:
+  In single-metric domain logic, Sample 28 represents healthy performance (exceptionally low latency and minimal error rate). However, IsolationForest does not evaluate operational semantics; it evaluates geometric isolation density across 5-dimensional feature space. The co-occurrence of unusually low latency (31.88ms) with elevated request volume (152) placed Sample 28 in a sparsely populated region of the training feature space. Random axis-aligned cuts isolated this point quickly across trees, producing a negative decision score ($-0.0054 < 0$). Because its raw score fell below the training-derived `offset_`, it was classified as an anomaly.
 
 ### 6.3 Analysis of IsolationForest False Negative (Index 45)
 - **Observed Metrics**:
   - `latency_ms`: 421.57 ms (severe latency surge)
   - `error_rate`: 0.0049 (normal baseline)
   - `request_count`: 133.0 (normal baseline)
-  - `cpu_usage_pct`: 71.50% (elevated)
+  - `cpu_usage_pct`: 71.50% (moderately elevated)
   - `memory_usage_pct`: 43.39% (normal baseline)
-- **Root Rationale**:
-  With `contamination=0.05` on a 100-sample dataset, IsolationForest has an exact budget of $\lfloor 100 \times 0.05 \rfloor = 5$ predicted anomalies. Because Sample 28 occupied one of the five anomaly slots with score `-0.0054`, Sample 45 missed the cutoff and was classified as an inlier ($+1$).
+- **Decision Score**: `+0.0053` (7th lowest in evaluation set)
+- **Mathematical Rationale**:
+  Despite experiencing an injected latency spike (421.57 ms), Sample 45's decision score remained slightly positive (`+0.0053 > 0`), which falls on the inlier side of the decision boundary ($\text{offset\_}$). Because four of its five dimensions (`error_rate=0.0049`, `request_count=133`, `memory=43.39%`, and `cpu=71.5%`) were at or near normal baseline density, random orthogonal splits selecting those four features did not isolate Sample 45 quickly. Across the ensemble of 100 trees, its average path length was not sufficiently short to breach the training `offset_`.
 
 ---
 
@@ -152,9 +159,10 @@ The threshold baseline achieved perfect Precision (1.0) and Recall (1.0). This i
 
 ### 7.2 Why IsolationForest Behaves Differently
 1. **Multivariate Geometry vs Business Rules**: IsolationForest evaluates high-dimensional feature combinations without knowing what a metric "means." It treats a healthy-but-rare combination identically to a degraded-and-rare combination.
-2. **Contamination is a Hyperparameter, Not Ground Truth**: Setting `contamination=0.05` asserts a modeling assumption that $5\%$ of points are outliers. It does not measure the actual ground-truth anomaly rate of the environment. If the true anomaly rate is $1\%$, `contamination=0.05` will inevitably produce false alarms; if the true rate is $15\%$, it will guarantee false negatives.
-3. **Anomaly Score is NOT Outage Probability**: An anomaly score (e.g. $-0.0373$) represents path length in a random partitioning tree. It is not a calibrated posterior probability of service downtime, failure, or outage.
-4. **Anomaly Detection is NOT Root Cause Diagnosis**: Neither detector proves root cause. A detector notes that an observed measurement or feature vector deviated from an expectation; it does not diagnose database deadlocks, network interface discards, GC pauses, or bad deployments.
+2. **Contamination is a Hyperparameter, Not Ground Truth**: Setting `contamination=0.05` sets the offset threshold based on the 5th percentile of anomaly scores on the *training data*. It does not measure the actual ground-truth anomaly rate of the environment, nor does it enforce a strict 5-sample quota on unseen test datasets. If the true anomaly rate is $1\%$, a model calibrated to 5% will inevitably produce false alarms; if the true rate is $15\%$, it will guarantee false negatives.
+3. **No Per-Feature Causal Attribution**: IsolationForest is an unsupervised ensemble method based on average path lengths in randomized tree partitions. It outputs a scalar outlier score for the entire feature vector; it does **not** provide verified per-feature causal explanations or identify "root cause." A negative score indicates geometric isolation in 5D space, not that latency or CPU "caused" the event.
+4. **Anomaly Score is NOT Outage Probability**: An anomaly score (e.g. $-0.0373$) represents path length in a random partitioning tree. It is not a calibrated posterior probability of service downtime, failure, or outage.
+5. **Anomaly Detection is NOT Root Cause Diagnosis**: Neither detector proves root cause. A detector notes that an observed measurement or feature vector deviated from an expectation; it does not diagnose database deadlocks, network interface discards, GC pauses, or bad deployments.
 
 ---
 

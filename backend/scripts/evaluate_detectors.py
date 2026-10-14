@@ -324,7 +324,8 @@ if __name__ == "__main__":
     out_path = os.path.join(out_dir, "evaluation_results.json")
     
     export_payload = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "benchmark_version": "1.0.0",
+        "benchmark_reference_time": DEFAULT_REFERENCE_TIME.isoformat(),
         "metrics": {
             k: asdict(v) for k, v in results.items()
         },

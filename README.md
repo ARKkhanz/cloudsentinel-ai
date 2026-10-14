@@ -132,24 +132,27 @@ cloudsentinel-ai/
 * **Google Chrome** (tested on Chrome v141)
 
 ### 1. Backend Setup & Startup
-Open a PowerShell terminal in the repository root:
+Open a terminal in the repository root:
 
-```powershell
-cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai
+```bash
+# Clone and enter directory
+cd cloudsentinel-ai
 
-# Activate virtual environment
+# Activate virtual environment (Windows PowerShell)
 .\backend\.venv\Scripts\Activate.ps1
+# Or on Linux/macOS:
+# source backend/.venv/bin/activate
 
 # Run FastAPI backend service from repository root
-.\backend\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 ```
 FastAPI runs at `http://127.0.0.1:8000`. Swagger documentation is available at `http://127.0.0.1:8000/docs`.
 
 ### 2. Frontend Setup & Startup
-Open a second PowerShell terminal in the repository root:
+Open a second terminal in the repository root:
 
-```powershell
-cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai\frontend
+```bash
+cd frontend
 
 # Start the Vite development server
 npm run dev -- --host 127.0.0.1 --port 5173
@@ -162,9 +165,9 @@ Dashboard is served at `http://127.0.0.1:5173`.
 
 To run the reproducible benchmark comparing `ThresholdDetector` and `IsolationForestDetector` against held-out telemetry:
 
-```powershell
-cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai
-.\backend\.venv\Scripts\python.exe backend/scripts/evaluate_detectors.py
+```bash
+# From repository root with virtual environment active:
+python backend/scripts/evaluate_detectors.py
 ```
 
 ### Benchmark Summary (Seed 100 Train, Seed 42 Held-out Eval)
@@ -237,23 +240,23 @@ Retrieve complete persisted incident information including observed measurements
 ## Verification & Testing Suite
 
 ### 1. Backend pytest Suite (114 Tests, 100% Pass)
-```powershell
-cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai
-.\backend\.venv\Scripts\python.exe -m pytest -v
+```bash
+# From repository root:
+pytest -v
 ```
 *Result*: **114 passed, 0 failed** in ~13.1s across all 8 test modules.
 
 ### 2. Frontend Production Build
-```powershell
-cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai\frontend
+```bash
+cd frontend
 npm run build
 ```
 *Result*: TypeScript compilation check (`tsc -b`) and Vite production bundle passed in 1.02s.
 
 ### 3. Real Google Chrome Automated Browser QA
-```powershell
-cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai
-.\backend\.venv\Scripts\python.exe backend\tests\milestone6_browser_qa.py
+```bash
+# From repository root with backend and frontend running:
+python backend/tests/milestone6_browser_qa.py
 ```
 *Result*: **11/11 PASSED (100%)** in Google Chrome via Chrome DevTools Protocol (CDP):
 * Initial health connection verification.
