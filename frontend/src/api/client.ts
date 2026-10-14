@@ -8,9 +8,12 @@ import {
   IncidentResponse,
 } from '../types/incidents';
 
-// Resolves backend API base URL from Vite environment with local fallback
+// Resolves backend API base URL from Vite environment.
+// Honors empty string "" for same-origin relative URLs in Docker/Nginx production,
+// falling back to local development server "http://localhost:8000" if undefined.
+const rawApiBase = import.meta.env.VITE_API_BASE_URL;
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL?.trim() || 'http://localhost:8000';
+  typeof rawApiBase === 'string' ? rawApiBase.trim() : 'http://localhost:8000';
 
 export class ApiError extends Error {
   status: number;
@@ -47,7 +50,8 @@ export async function fetchHealth(): Promise<HealthResponse> {
       throw error;
     }
     throw new Error(
-      `Network error connecting to backend at ${url}. Ensure the FastAPI server is running.`
+      `Network error connecting to backend at ${url}. Ensure the FastAPI server is running.`,
+      { cause: error }
     );
   }
 }
@@ -93,7 +97,8 @@ export async function fetchMetrics(
       throw error;
     }
     throw new Error(
-      `Network error connecting to metrics API at ${url}. Ensure the FastAPI server is running.`
+      `Network error connecting to metrics API at ${url}. Ensure the FastAPI server is running.`,
+      { cause: error }
     );
   }
 }
@@ -135,7 +140,10 @@ export async function generateDemoData(
     if (error instanceof ApiError) {
       throw error;
     }
-    throw new Error(`Network error calling demo generate at ${url}: ${(error as Error).message}`);
+    throw new Error(
+      `Network error calling demo generate at ${url}: ${(error as Error).message}`,
+      { cause: error }
+    );
   }
 }
 
@@ -173,7 +181,10 @@ export async function runDetection(
     if (error instanceof ApiError) {
       throw error;
     }
-    throw new Error(`Network error calling detection run at ${url}: ${(error as Error).message}`);
+    throw new Error(
+      `Network error calling detection run at ${url}: ${(error as Error).message}`,
+      { cause: error }
+    );
   }
 }
 
@@ -212,7 +223,10 @@ export async function fetchIncidents(
     if (error instanceof ApiError) {
       throw error;
     }
-    throw new Error(`Network error connecting to incidents API at ${url}: ${(error as Error).message}`);
+    throw new Error(
+      `Network error connecting to incidents API at ${url}: ${(error as Error).message}`,
+      { cause: error }
+    );
   }
 }
 
@@ -240,6 +254,9 @@ export async function fetchIncidentById(id: string): Promise<IncidentResponse> {
     if (error instanceof ApiError) {
       throw error;
     }
-    throw new Error(`Network error fetching incident at ${url}: ${(error as Error).message}`);
+    throw new Error(
+      `Network error fetching incident at ${url}: ${(error as Error).message}`,
+      { cause: error }
+    );
   }
 }

@@ -9,8 +9,13 @@ from backend.app.db.base import Base
 
 logger = logging.getLogger(__name__)
 
-# Ensure parent directory for default SQLite database exists
+# Ensure parent directory for SQLite database exists
 if settings.database_url.startswith("sqlite:///"):
+    db_file_path = settings.database_url.replace("sqlite:///", "")
+    if ":memory:" not in db_file_path:
+        db_dir = os.path.dirname(os.path.abspath(db_file_path))
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
     os.makedirs(settings.data_dir, exist_ok=True)
 
 # Create engine with check_same_thread=False for SQLite multithreaded requests

@@ -51,7 +51,25 @@ export interface DetectionRunResponse {
   incidents_already_existing: number;
   created_incident_ids: string[];
   run_timestamp: string;
-  detector_metadata: Record<string, any>;
+  detector_metadata: Record<string, unknown>;
+}
+
+export interface MLModelMetadata {
+  n_estimators?: number;
+  contamination?: number;
+  training_sample_count?: number;
+  random_state?: number;
+  feature_names?: string[];
+  [key: string]: unknown;
+}
+
+export interface BaselineEvidence {
+  anomaly_score?: number;
+  prediction_label?: number | string;
+  model_metadata?: MLModelMetadata;
+  triggered_conditions?: string[];
+  thresholds?: Record<string, number>;
+  [key: string]: unknown;
 }
 
 export interface IncidentResponse {
@@ -65,7 +83,7 @@ export interface IncidentResponse {
   summary: string;
   explanation: string;
   observed_metric_evidence: Record<string, number>;
-  baseline_evidence: Record<string, any>;
+  baseline_evidence: BaselineEvidence;
   window_start: string;
   window_end: string;
   metric_sample_id?: number | null;

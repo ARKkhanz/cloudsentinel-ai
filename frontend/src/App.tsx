@@ -53,7 +53,15 @@ export const App: React.FC = () => {
 
   // Fetch on initial mount
   useEffect(() => {
-    loadData();
+    let ignore = false;
+    Promise.resolve().then(() => {
+      if (!ignore) {
+        void loadData();
+      }
+    });
+    return () => {
+      ignore = true;
+    };
   }, [loadData]);
 
   // 1. Generate Synthetic Demo Data
@@ -739,7 +747,7 @@ export const App: React.FC = () => {
                   <div className="evidence-card">
                     <span className="evidence-card-label">Classification Label</span>
                     <span className="evidence-card-value">
-                      {selectedIncident.baseline_evidence.prediction_label} (Outlier)
+                      {String(selectedIncident.baseline_evidence.prediction_label ?? -1)} (Outlier)
                     </span>
                   </div>
                   <div className="evidence-card">
