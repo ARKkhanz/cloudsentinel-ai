@@ -232,4 +232,42 @@ Empirical evaluation demonstrated key operational trade-offs:
 | **Frontend Production Build** | TypeScript compiler check (`tsc -b`) & Vite bundler | **Pass** (0 errors) | ~1.0s |
 | **Reproducible ML Benchmark** | Standalone benchmark runner (`backend/scripts/evaluate_detectors.py`) | **Reproduced** (100 samples) | ~0.6s |
 | **Real Chrome Browser QA** | 11 automated CDP steps (Connection, Generation, Threshold, ML, Evidence, Dedup, Persistence, Mobile) | **11 passed, 0 failed** | ~24s |
+| **GitHub Actions CI (All 3 Jobs)** | Backend pytest (114), Frontend ESLint/Vite, Docker Compose multi-container integration & persistence | **100% Green** | ~1m 40s |
+
+---
+
+## 4. Day 3: Containerization, Orchestration & Continuous Integration
+
+### 4.1 Continuous Integration (CI) Principles
+Continuous Integration is the automated engineering practice of validating every code change against an isolated, reproducible environment upon push. In CloudSentinel AI, CI ensures that code quality, unit tests, machine learning evaluation baselines, and multi-container Docker orchestration are automatically proven on disposable Ubuntu cloud runners before deployment.
+
+### 4.2 GitHub Actions Architecture: Workflows, Jobs, and Steps
+- **Workflow** (`.github/workflows/ci.yml`): The top-level automated process defined in YAML, triggered by events (`push`, `pull_request`, `workflow_dispatch`).
+- **Jobs** (`backend-tests`, `frontend-checks`, `docker-integration`): Parallel execution units running on independent, fresh `ubuntu-latest` virtual machines.
+- **Steps**: Sequential tasks inside a job executing individual commands (checkout, setup-python, npm ci, docker compose up).
+
+### 4.3 Why Hosted Cloud Runners Solve Local Toolchain Constraints
+The local development Windows workstation did not have Docker Desktop installed. Rather than attempting risky, unverified local container operations, we designed and committed declarative Docker and Compose definitions, and leveraged GitHub-hosted Ubuntu runners (which include real, running Docker Engines and Compose plugins) to achieve authentic, verifiable runtime execution.
+
+### 4.4 Image Compilation vs. Runtime System Validation
+A Docker image building without syntax errors only proves that dependencies installed and files copied. It does **NOT** prove:
+- That the process binds correctly to `0.0.0.0` instead of `127.0.0.1`.
+- That Nginx can resolve `backend` over the Docker bridge network.
+- That the non-root user has write permissions to create SQLite write-ahead logs (`.db-wal`).
+- That database records survive container destruction and restart.
+Only live container orchestration tests (Phase 5–10) provide authentic engineering proof.
+
+### 4.5 Health Checks and Startup Ordering
+FastAPI's `@router.get("/health")` endpoint is polled via Python standard library `urllib.request`. In Compose, `frontend` specifies `depends_on.backend.condition: service_healthy` with a 15-second `start_period`, ensuring Nginx does not proxy traffic until Scikit-Learn models and SQLAlchemy schemas have initialized.
+
+### 4.6 Reverse Proxying & Internal DNS Concealment
+In production, the browser only speaks to `http://localhost:3000`. It makes relative requests (`/health`, `/api/metrics`). Nginx resolves `http://backend:8000` via Docker's internal DNS (`127.0.0.11`). The internal container hostname `backend:8000` never leaks into browser JavaScript bundles, eliminating CORS preflight overhead and concealing container network topology.
+
+### 4.7 SQLite Volume Persistence Across Container Lifecycle
+- **`docker compose down`**: Stops and removes container namespaces and networks, but **preserves** the named volume `cloudsentinel-data`.
+- **`docker compose up -d`**: Re-attaches the existing volume. Our automated CI integration script proved that telemetry observations (100 samples) and incident records persisted across a full container down/up recreation cycle.
+- **`docker compose down -v`**: Destructively deletes named volumes. It is reserved strictly for test teardown and clean slate resets.
+
+### 4.8 Non-Root Permissions on Mounted Volumes
+In `backend/Dockerfile`, `/app/backend/data` is created and assigned to `cloudsentinel:appgroup`. When Docker initializes a named volume for a container, it copies the image directory's initial metadata and file permissions into the volume. This guarantees that SQLite transactions succeed without encountering read-only filesystem errors under `USER cloudsentinel`.
 

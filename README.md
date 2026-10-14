@@ -1,5 +1,7 @@
 # CloudSentinel AI
 
+[![CloudSentinel AI CI](https://github.com/ARKkhanz/cloudsentinel-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/ARKkhanz/cloudsentinel-ai/actions/workflows/ci.yml)
+
 > **An AI-assisted cloud reliability prototype that detects unusual service metrics, creates evidence-backed incidents, and helps a developer investigate them.**
 
 Developed as a four-day engineering project following the *CloudSentinel AI Implementation & Learning Blueprint*.
@@ -26,7 +28,7 @@ Developed as a four-day engineering project following the *CloudSentinel AI Impl
   - [x] **Milestone 1**: Engineering quality, dependency hygiene, ESLint 10, and security review
   - [x] **Milestone 2**: Secure backend and frontend Dockerfiles + production Nginx configuration
   - [x] **Milestone 3**: Docker Compose multi-container orchestration, networking, and SQLite volume persistence
-  - [ ] **Milestone 4**: GitHub Actions automated CI workflow *(Planned)*
+  - [x] **Milestone 4**: GitHub Actions CI workflow + real Docker multi-container integration and SQLite persistence verification
 - **Day 4: End-to-End Verification, Documentation & Demo** *(Planned)*
 
 ---
@@ -310,6 +312,33 @@ docker compose down
 
 > [!NOTE]
 > Detailed container architecture, volume lifecycle, and verification matrices are documented in [`docs/milestone-3-orchestration.md`](docs/milestone-3-orchestration.md).
+
+---
+
+## Continuous Integration (GitHub Actions)
+
+CloudSentinel AI runs an automated, multi-job continuous integration pipeline on GitHub-hosted `ubuntu-latest` runners:
+
+* **Workflow**: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+* **Latest Verified Run**: [Run #38592619843 (100% Green)](https://github.com/ARKkhanz/cloudsentinel-ai/actions/runs/38592619843)
+
+### Automated Pipeline Jobs
+
+1. **`backend-tests`** (Ubuntu, Python 3.11):
+   - Executes full 114-test regression suite (`pytest -v`).
+   - Executes standalone detector evaluation benchmark (`evaluate_detectors.py`).
+2. **`frontend-checks`** (Ubuntu, Node.js 24):
+   - Runs clean install (`npm ci`) with dependency caching.
+   - Executes ESLint linter (`npm run lint`, 0 warnings/errors).
+   - Executes TypeScript compiler check and Vite production bundle (`npm run build`).
+3. **`docker-integration`** (Ubuntu, Real Docker Engine & Compose):
+   - Validates Compose specification (`docker compose config --quiet`).
+   - Builds container images (`docker compose build`).
+   - Starts multi-container stack (`docker compose up -d`).
+   - Verifies direct health (`:8000/health`) and proxied Nginx health (`:3000/health`).
+   - Tests telemetry generation, threshold detection, and IsolationForest anomaly detection.
+   - Tests incident deduplication (0 duplicate incidents created on repeated run).
+   - Tests SQLite named volume persistence across container recreation (`docker compose down` -> `docker compose up -d`).
 
 ---
 
