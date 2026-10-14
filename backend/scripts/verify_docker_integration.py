@@ -23,41 +23,59 @@ BACKEND_URL = "http://localhost:8000"
 FRONTEND_URL = "http://localhost:3000"
 
 
-def http_request(url: str, method: str = "GET", data: dict = None) -> tuple[int, dict | str]:
+def http_request(url: str, method: str = "GET", data: dict = None, retries: int = 3) -> tuple[int, dict | str]:
     headers = {"Accept": "application/json"}
     body_bytes = None
     if data is not None:
         headers["Content-Type"] = "application/json"
         body_bytes = json.dumps(data).encode("utf-8")
 
-    req = urllib.request.Request(url, data=body_bytes, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            status = resp.status
-            content = resp.read().decode("utf-8")
-            try:
-                return status, json.loads(content)
-            except Exception:
-                return status, content
-    except urllib.error.HTTPError as exc:
-        err_content = exc.read().decode("utf-8")
+    last_exc = None
+    for attempt in range(retries):
+        req = urllib.request.Request(url, data=body_bytes, headers=headers, method=method)
         try:
-            return exc.code, json.loads(err_content)
-        except Exception:
-            return exc.code, err_content
-    except Exception as exc:
-        return 0, str(exc)
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                status = resp.status
+                content = resp.read().decode("utf-8")
+                try:
+                    return status, json.loads(content)
+                except Exception:
+                    return status, content
+        except urllib.error.HTTPError as exc:
+            err_content = exc.read().decode("utf-8")
+            try:
+                return exc.code, json.loads(err_content)
+            except Exception:
+                return exc.code, err_content
+        except (urllib.error.URLError, ConnectionResetError, ConnectionRefusedError, TimeoutError, OSError) as exc:
+            last_exc = exc
+            if attempt < retries - 1:
+                time.sleep(1.5)
+                continue
+            return 0, str(exc)
+        except Exception as exc:
+            return 0, str(exc)
+    return 0, str(last_exc)
 
 
-def wait_for_backend(url: str = BACKEND_URL, timeout_seconds: int = 45) -> bool:
-    print(f"Waiting for backend at {url}/health (up to {timeout_seconds}s)...")
+def wait_for_services(timeout_seconds: int = 45) -> bool:
+    print(f"Waiting for services to become healthy (up to {timeout_seconds}s)...")
     start = time.time()
     attempt = 0
+    backend_ok = False
+    frontend_ok = False
     while time.time() - start < timeout_seconds:
         attempt += 1
-        status, body = http_request(f"{url}/health")
-        if status == 200 and isinstance(body, dict) and body.get("status") == "ok":
-            print(f"  [OK] Backend healthy on attempt {attempt} ({time.time() - start:.1f}s)")
+        if not backend_ok:
+            s_b, b_body = http_request(f"{BACKEND_URL}/health", retries=1)
+            if s_b == 200 and isinstance(b_body, dict) and b_body.get("status") == "ok":
+                backend_ok = True
+        if not frontend_ok:
+            s_f, f_body = http_request(f"{FRONTEND_URL}/health", retries=1)
+            if s_f == 200 and isinstance(f_body, dict) and f_body.get("status") == "ok":
+                frontend_ok = True
+        if backend_ok and frontend_ok:
+            print(f"  [OK] Both backend (:8000) and frontend (:3000) healthy on attempt {attempt} ({time.time() - start:.1f}s)")
             return True
         time.sleep(2)
     return False
@@ -67,6 +85,9 @@ def main():
     print("==================================================================")
     print(" CloudSentinel AI — Docker Integration & Persistence Test Suite")
     print("==================================================================")
+
+    # Initial readiness verification
+    assert wait_for_services(timeout_seconds=45), "Initial services failed to become healthy!"
 
     # 1. Direct Backend Health
     print("\n[Phase 1] Testing direct backend health on port 8000...")
@@ -168,8 +189,8 @@ def main():
     res_up = subprocess.run(["docker", "compose", "up", "-d"], capture_output=True, text=True)
     assert res_up.returncode == 0, f"docker compose up -d failed: {res_up.stderr}"
 
-    # Wait for backend health
-    assert wait_for_backend(BACKEND_URL, timeout_seconds=45), "Backend failed to become healthy after restart!"
+    # Wait for both services to report healthy
+    assert wait_for_services(timeout_seconds=45), "Services failed to become healthy after restart!"
 
     # Verify sample incident still exists
     status, reloaded_incident = http_request(f"{FRONTEND_URL}/api/incidents/{sample_incident_id}")
