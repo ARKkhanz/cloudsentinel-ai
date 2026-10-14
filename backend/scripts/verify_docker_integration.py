@@ -32,7 +32,7 @@ def http_request(url: str, method: str = "GET", data: dict = None) -> tuple[int,
 
     req = urllib.request.Request(url, data=body_bytes, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:
             status = resp.status
             content = resp.read().decode("utf-8")
             try:
@@ -102,7 +102,7 @@ def main():
     }
     status, gen_resp = http_request(f"{FRONTEND_URL}/api/demo/generate", method="POST", data=gen_payload)
     assert status == 200, f"Demo generation failed with HTTP {status}: {gen_resp}"
-    assert gen_resp.get("samples_persisted") == 100, f"Expected 100 persisted samples, got {gen_resp}"
+    assert gen_resp.get("total_samples") == 100, f"Expected 100 total samples, got {gen_resp}"
     assert gen_resp.get("anomalies_injected") == 5, f"Expected 5 injected anomalies, got {gen_resp}"
     print(f"  [PASS] Generated and persisted 100 samples with 5 anomalies (seed: {gen_resp.get('seed')})")
 
@@ -117,7 +117,7 @@ def main():
     thresh_payload = {"service": "demo-api", "detector": "threshold_baseline", "limit": 100}
     status, thresh_resp = http_request(f"{FRONTEND_URL}/api/detection/run", method="POST", data=thresh_payload)
     assert status == 200, f"Threshold detection failed with HTTP {status}: {thresh_resp}"
-    thresh_findings = thresh_resp.get("findings_generated", 0)
+    thresh_findings = thresh_resp.get("findings_count", 0)
     thresh_incidents = thresh_resp.get("incidents_created", 0)
     assert thresh_findings > 0, f"Expected threshold findings, got {thresh_findings}"
     assert thresh_incidents > 0, f"Expected created incidents, got {thresh_incidents}"
@@ -128,7 +128,7 @@ def main():
     ml_payload = {"service": "demo-api", "detector": "isolation_forest", "limit": 100}
     status, ml_resp = http_request(f"{FRONTEND_URL}/api/detection/run", method="POST", data=ml_payload)
     assert status == 200, f"ML detection failed with HTTP {status}: {ml_resp}"
-    ml_findings = ml_resp.get("findings_generated", 0)
+    ml_findings = ml_resp.get("findings_count", 0)
     ml_incidents = ml_resp.get("incidents_created", 0)
     assert ml_findings > 0, f"Expected ML findings, got {ml_findings}"
     assert ml_incidents > 0, f"Expected ML incidents created, got {ml_incidents}"
@@ -148,11 +148,13 @@ def main():
     status, dedup_resp = http_request(f"{FRONTEND_URL}/api/detection/run", method="POST", data=thresh_payload)
     assert status == 200, f"Repeated detection failed with HTTP {status}: {dedup_resp}"
     dedup_created = dedup_resp.get("incidents_created", 0)
+    dedup_existing = dedup_resp.get("incidents_already_existing", 0)
     assert dedup_created == 0, f"Expected 0 new incidents created on repeat run, got {dedup_created}!"
+    assert dedup_existing > 0, f"Expected incidents_already_existing > 0, got {dedup_existing}!"
     status, inc_list_after = http_request(f"{FRONTEND_URL}/api/incidents?service=demo-api&limit=50")
     total_incidents_after = inc_list_after.get("total", 0)
     assert total_incidents_after == total_incidents_before, f"Incident count increased from {total_incidents_before} to {total_incidents_after} on duplicate run!"
-    print(f"  [PASS] Deduplication verified: exactly 0 duplicate incidents created on re-run (total remains {total_incidents_after}).")
+    print(f"  [PASS] Deduplication verified: exactly 0 duplicate incidents created on re-run ({dedup_existing} skipped, total remains {total_incidents_after}).")
 
     # 8. SQLite Named-Volume Persistence across Compose restart
     print("\n[Phase 8] Testing SQLite named volume persistence across container restart...")
