@@ -109,7 +109,7 @@ def main():
     # Verify telemetry retrieval
     status, metrics_resp = http_request(f"{FRONTEND_URL}/api/metrics?service=demo-api&limit=100")
     assert status == 200, f"Fetching metrics failed with HTTP {status}: {metrics_resp}"
-    assert metrics_resp.get("total") == 100, f"Expected 100 total metrics in DB, got {metrics_resp.get('total')}"
+    assert metrics_resp.get("total_samples") == 100, f"Expected 100 total metrics in DB, got {metrics_resp.get('total_samples')}"
     print(f"  [PASS] Verified 100 metrics retrieved through Nginx proxy /api/metrics.")
 
     # 5. Execute Threshold Baseline Detection
@@ -139,7 +139,9 @@ def main():
     assert status == 200, f"Fetching incidents failed with HTTP {status}: {inc_list}"
     total_incidents_before = inc_list.get("total", 0)
     assert total_incidents_before >= thresh_incidents + ml_incidents, f"Expected incidents >= {thresh_incidents + ml_incidents}, got {total_incidents_before}"
-    sample_incident = inc_list["items"][0]
+    incident_items = inc_list.get("data", [])
+    assert len(incident_items) > 0, "No incidents found in response data"
+    sample_incident = incident_items[0]
     sample_incident_id = sample_incident["id"]
     print(f"  [PASS] Persisted incident count: {total_incidents_before}. Sample Incident ID: {sample_incident_id}")
 
@@ -179,7 +181,7 @@ def main():
     # Verify telemetry count still 100
     status, reloaded_metrics = http_request(f"{FRONTEND_URL}/api/metrics?service=demo-api&limit=100")
     assert status == 200, f"Failed to retrieve metrics after restart: {reloaded_metrics}"
-    assert reloaded_metrics.get("total") == 100, f"Expected 100 metrics after restart, got {reloaded_metrics.get('total')}"
+    assert reloaded_metrics.get("total_samples") == 100, f"Expected 100 metrics after restart, got {reloaded_metrics.get('total_samples')}"
     print(f"  [PASS] Verified 100 telemetry samples persisted across container recreation.")
 
     print("\n==================================================================")
