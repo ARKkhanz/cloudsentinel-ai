@@ -1,0 +1,226 @@
+{
+  "timestamp": "2026-10-14T13:50:57.270545+00:00",
+  "metrics": {
+    "threshold_baseline": {
+      "detector_name": "threshold_baseline",
+      "detector_type": "statistical_threshold",
+      "total_samples": 100,
+      "ground_truth_anomalies": 5,
+      "predicted_anomalies": 5,
+      "true_positives": 5,
+      "false_positives": 0,
+      "true_negatives": 95,
+      "false_negatives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "false_positive_rate": 0.0,
+      "config": {
+        "latency_threshold_ms": 150.0,
+        "error_rate_threshold": 0.05
+      }
+    },
+    "isolation_forest": {
+      "detector_name": "isolation_forest",
+      "detector_type": "unsupervised_isolation_forest",
+      "total_samples": 100,
+      "ground_truth_anomalies": 5,
+      "predicted_anomalies": 5,
+      "true_positives": 4,
+      "false_positives": 1,
+      "true_negatives": 94,
+      "false_negatives": 1,
+      "precision": 0.8,
+      "recall": 0.8,
+      "f1_score": 0.8,
+      "false_positive_rate": 0.0105,
+      "config": {
+        "random_state": 42,
+        "n_estimators": 100,
+        "contamination": 0.05,
+        "training_samples": 100,
+        "training_seed": 100,
+        "feature_names": [
+          "latency_ms",
+          "error_rate",
+          "cpu_usage_pct",
+          "memory_usage_pct",
+          "request_count"
+        ]
+      }
+    }
+  },
+  "trace": {
+    "metadata": {
+      "service": "demo-api",
+      "train_samples": 100,
+      "train_seed": 100,
+      "eval_samples": 100,
+      "eval_seed": 42,
+      "latency_spikes_injected": 3,
+      "error_spikes_injected": 2,
+      "total_ground_truth_anomalies": 5
+    },
+    "ground_truth_items": [
+      {
+        "sample_index": 13,
+        "timestamp": "2026-10-14T11:47:00+00:00",
+        "anomaly_type": "latency_spike",
+        "injected_value": 333.24,
+        "baseline_mean": 42.0
+      },
+      {
+        "sample_index": 24,
+        "timestamp": "2026-10-14T11:36:00+00:00",
+        "anomaly_type": "latency_spike",
+        "injected_value": 503.7,
+        "baseline_mean": 42.0
+      },
+      {
+        "sample_index": 40,
+        "timestamp": "2026-10-14T11:20:00+00:00",
+        "anomaly_type": "error_rate_spike",
+        "injected_value": 0.2463,
+        "baseline_mean": 0.005
+      },
+      {
+        "sample_index": 43,
+        "timestamp": "2026-10-14T11:17:00+00:00",
+        "anomaly_type": "error_rate_spike",
+        "injected_value": 0.1617,
+        "baseline_mean": 0.005
+      },
+      {
+        "sample_index": 45,
+        "timestamp": "2026-10-14T11:15:00+00:00",
+        "anomaly_type": "latency_spike",
+        "injected_value": 421.57,
+        "baseline_mean": 42.0
+      }
+    ],
+    "threshold_findings": {
+      "13": {
+        "observed": {
+          "latency_ms": 333.24,
+          "error_rate": 0.0031,
+          "request_count": 146.0,
+          "cpu_usage_pct": 85.79,
+          "memory_usage_pct": 42.66
+        },
+        "conditions": [
+          "latency_ms_exceeded"
+        ],
+        "summary": "Elevated Latency on demo-api (333.2 ms)"
+      },
+      "24": {
+        "observed": {
+          "latency_ms": 503.7,
+          "error_rate": 0.0031,
+          "request_count": 119.0,
+          "cpu_usage_pct": 72.46,
+          "memory_usage_pct": 40.21
+        },
+        "conditions": [
+          "latency_ms_exceeded"
+        ],
+        "summary": "Elevated Latency on demo-api (503.7 ms)"
+      },
+      "40": {
+        "observed": {
+          "latency_ms": 60.16,
+          "error_rate": 0.2463,
+          "request_count": 151.0,
+          "cpu_usage_pct": 22.32,
+          "memory_usage_pct": 44.07
+        },
+        "conditions": [
+          "error_rate_exceeded"
+        ],
+        "summary": "High Error Rate on demo-api (24.6%)"
+      },
+      "43": {
+        "observed": {
+          "latency_ms": 55.44,
+          "error_rate": 0.1617,
+          "request_count": 130.0,
+          "cpu_usage_pct": 27.89,
+          "memory_usage_pct": 43.29
+        },
+        "conditions": [
+          "error_rate_exceeded"
+        ],
+        "summary": "High Error Rate on demo-api (16.2%)"
+      },
+      "45": {
+        "observed": {
+          "latency_ms": 421.57,
+          "error_rate": 0.0049,
+          "request_count": 133.0,
+          "cpu_usage_pct": 71.5,
+          "memory_usage_pct": 43.39
+        },
+        "conditions": [
+          "latency_ms_exceeded"
+        ],
+        "summary": "Elevated Latency on demo-api (421.6 ms)"
+      }
+    },
+    "ml_findings": {
+      "13": {
+        "observed": {
+          "latency_ms": 333.24,
+          "error_rate": 0.0031,
+          "cpu_usage_pct": 85.79,
+          "memory_usage_pct": 42.66,
+          "request_count": 146.0
+        },
+        "anomaly_score": -0.0364,
+        "summary": "Multivariate Anomaly Detected by IsolationForest on demo-api (score: -0.0364)"
+      },
+      "24": {
+        "observed": {
+          "latency_ms": 503.7,
+          "error_rate": 0.0031,
+          "cpu_usage_pct": 72.46,
+          "memory_usage_pct": 40.21,
+          "request_count": 119.0
+        },
+        "anomaly_score": -0.0445,
+        "summary": "Multivariate Anomaly Detected by IsolationForest on demo-api (score: -0.0445)"
+      },
+      "28": {
+        "observed": {
+          "latency_ms": 31.88,
+          "error_rate": 0.0018,
+          "cpu_usage_pct": 25.46,
+          "memory_usage_pct": 42.83,
+          "request_count": 152.0
+        },
+        "anomaly_score": -0.0054,
+        "summary": "Multivariate Anomaly Detected by IsolationForest on demo-api (score: -0.0054)"
+      },
+      "40": {
+        "observed": {
+          "latency_ms": 60.16,
+          "error_rate": 0.2463,
+          "cpu_usage_pct": 22.32,
+          "memory_usage_pct": 44.07,
+          "request_count": 151.0
+        },
+        "anomaly_score": -0.0373,
+        "summary": "Multivariate Anomaly Detected by IsolationForest on demo-api (score: -0.0373)"
+      },
+      "43": {
+        "observed": {
+          "latency_ms": 55.44,
+          "error_rate": 0.1617,
+          "cpu_usage_pct": 27.89,
+          "memory_usage_pct": 43.29,
+          "request_count": 130.0
+        },
+        "anomaly_score": -0.0011,
+        "summary": "Multivariate Anomaly Detected by IsolationForest on demo-api (score: -0.0011)"
+      }
+    }
+  }
+}

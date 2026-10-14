@@ -535,3 +535,215 @@ def test_21_no_fabricated_root_cause_explanations(client: TestClient, db_session
     assert "outlier" in ml_inc.explanation.lower()
     for speculation in ("database lock", "memory leak", "network partition", "bug in code", "root cause"):
         assert speculation not in ml_inc.explanation.lower()
+
+
+def test_22_deduplication_changed_metrics_at_same_timestamp_creates_incident(client: TestClient, db_session: Session):
+    """
+    Verify that when regenerated telemetry at the same timestamp contains changed measurements,
+    the fingerprint distinguishes it and creates a genuine new incident instead of falsely suppressing it.
+    """
+    fixed_ts = datetime(2026, 10, 14, 12, 0, 0, tzinfo=timezone.utc)
+    service = "dynamic-batch-service"
+
+    # Observation 1: Moderate latency spike
+    sample_1 = MetricSampleModel(
+        service=service,
+        timestamp=fixed_ts,
+        latency_ms=220.0,
+        error_rate=0.01,
+        request_count=100,
+        cpu_usage_pct=30.0,
+        memory_usage_pct=40.0,
+        is_synthetic=True,
+    )
+    db_session.add(sample_1)
+    db_session.commit()
+
+    run1 = client.post("/api/detection/run", json={"service": service, "detector": "threshold_baseline"})
+    assert run1.status_code == 200
+    data1 = run1.json()
+    assert data1["incidents_created"] == 1
+
+    # Observation 2: Same timestamp, but new telemetry measurements (severe latency surge)
+    # We clear the metric sample table or add sample 2 with changed metrics at same timestamp
+    sample_2 = MetricSampleModel(
+        service=service,
+        timestamp=fixed_ts,
+        latency_ms=490.0,
+        error_rate=0.09,
+        request_count=180,
+        cpu_usage_pct=85.0,
+        memory_usage_pct=70.0,
+        is_synthetic=True,
+    )
+    db_session.add(sample_2)
+    db_session.commit()
+
+    run2 = client.post("/api/detection/run", json={"service": service, "detector": "threshold_baseline"})
+    assert run2.status_code == 200
+    data2 = run2.json()
+    # Changed measurements at same timestamp must be distinguished and create an incident
+    assert data2["incidents_created"] == 1
+    assert data2["incidents_already_existing"] == 1
+
+    # Both incidents must be present in the database with their respective distinct evidence
+    incidents = db_session.query(IncidentModel).filter(IncidentModel.service == service).all()
+    assert len(incidents) == 2
+    latencies = {inc.observed_metric_evidence["latency_ms"] for inc in incidents}
+    assert 220.0 in latencies
+    assert 490.0 in latencies
+
+
+def test_23_deduplication_identical_metrics_regenerated_does_not_duplicate(client: TestClient, db_session: Session):
+    """
+    Verify that regenerating identical data and re-running detection creates zero duplicate incidents.
+    """
+    # 1. Generate demo metrics
+    gen_res = client.post("/api/demo/generate", json={"service": "regen-service", "total_samples": 40, "seed": 77})
+    assert gen_res.status_code == 200
+
+    # 2. Run detection
+    run1 = client.post("/api/detection/run", json={"service": "regen-service", "detector": "threshold_baseline"})
+    assert run1.status_code == 200
+    created_count = run1.json()["incidents_created"]
+    assert created_count > 0
+
+    # 3. Regenerate identical demo metrics with same seed
+    gen_res2 = client.post("/api/demo/generate", json={"service": "regen-service", "total_samples": 40, "seed": 77})
+    assert gen_res2.status_code == 200
+
+    # 4. Run detection again
+    run2 = client.post("/api/detection/run", json={"service": "regen-service", "detector": "threshold_baseline"})
+    assert run2.status_code == 200
+    assert run2.json()["incidents_created"] == 0
+    assert run2.json()["incidents_already_existing"] == created_count
+
+
+def test_24_deduplication_concurrency_conflict_handling_does_not_500(client: TestClient, db_session: Session):
+    """
+    Verify that an unexpected uniqueness conflict on dedup_key commit rolls back safely
+    and does not return an unhandled HTTP 500 error.
+    """
+    from backend.app.services.incident_service import generate_incident_fingerprint
+
+    service = "conflict-service"
+    fixed_ts = datetime(2026, 10, 14, 15, 0, 0, tzinfo=timezone.utc)
+    metrics = {
+        "latency_ms": 320.0,
+        "error_rate": 0.01,
+        "request_count": 100,
+        "cpu_usage_pct": 30.0,
+        "memory_usage_pct": 40.0,
+    }
+
+    # Pre-calculate the exact dedup_key for threshold detector
+    config_summary = "latency_thresh=150.00|error_thresh=0.0500"
+    expected_key = generate_incident_fingerprint(
+        service=service,
+        detector_name="threshold_baseline",
+        detector_version="1.0.0",
+        timestamp=fixed_ts,
+        observed_metric_values=metrics,
+        detector_config_summary=config_summary,
+    )
+
+    # Insert a conflicting row under a DIFFERENT service name so pre-query doesn't see it,
+    # but with the SAME dedup_key to trigger database uniqueness constraint on commit
+    conflict_inc = IncidentModel(
+        id=str(uuid.uuid4()),
+        service="other-service",
+        created_at=datetime.now(timezone.utc),
+        severity="warning",
+        status="open",
+        detector_name="threshold_baseline",
+        detector_version="1.0.0",
+        summary="Conflict collision",
+        explanation="Testing constraint",
+        observed_metric_evidence=metrics,
+        baseline_evidence={},
+        window_start=fixed_ts,
+        window_end=fixed_ts,
+        dedup_key=expected_key,
+    )
+    db_session.add(conflict_inc)
+    db_session.commit()
+
+    # Add the metric sample for conflict-service
+    sample = MetricSampleModel(
+        service=service,
+        timestamp=fixed_ts,
+        latency_ms=320.0,
+        error_rate=0.01,
+        request_count=100,
+        cpu_usage_pct=30.0,
+        memory_usage_pct=40.0,
+        is_synthetic=True,
+    )
+    db_session.add(sample)
+    db_session.commit()
+
+    # Running detection must NOT raise HTTP 500, but handle conflict gracefully
+    res = client.post("/api/detection/run", json={"service": service, "detector": "threshold_baseline"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["incidents_created"] == 0
+    assert data["incidents_already_existing"] == 1
+
+
+def test_25_deduplication_backward_compatibility_with_legacy_keys(client: TestClient, db_session: Session):
+    """
+    Verify that existing incidents created with legacy dedup_keys (service:detector:iso_timestamp)
+    are recognized during detection runs and not duplicated.
+    """
+    service = "legacy-dedup-service"
+    fixed_ts = datetime(2026, 10, 14, 16, 0, 0, tzinfo=timezone.utc)
+    metrics = {
+        "latency_ms": 300.0,
+        "error_rate": 0.01,
+        "request_count": 100,
+        "cpu_usage_pct": 30.0,
+        "memory_usage_pct": 40.0,
+    }
+    legacy_key = f"{service}:threshold_baseline:{fixed_ts.isoformat()}"
+
+    # Insert historical incident with legacy dedup key
+    historical_incident = IncidentModel(
+        id=str(uuid.uuid4()),
+        service=service,
+        created_at=datetime.now(timezone.utc),
+        severity="critical",
+        status="open",
+        detector_name="threshold_baseline",
+        detector_version="1.0.0",
+        summary="Historical legacy incident",
+        explanation="Created in earlier version",
+        observed_metric_evidence=metrics,
+        baseline_evidence={},
+        window_start=fixed_ts,
+        window_end=fixed_ts,
+        dedup_key=legacy_key,
+    )
+    db_session.add(historical_incident)
+
+    # Insert metric sample that produces the identical finding
+    sample = MetricSampleModel(
+        service=service,
+        timestamp=fixed_ts,
+        latency_ms=300.0,
+        error_rate=0.01,
+        request_count=100,
+        cpu_usage_pct=30.0,
+        memory_usage_pct=40.0,
+        is_synthetic=True,
+    )
+    db_session.add(sample)
+    db_session.commit()
+
+    # Run detection
+    res = client.post("/api/detection/run", json={"service": service, "detector": "threshold_baseline"})
+    assert res.status_code == 200
+    data = res.json()
+    # Must recognize legacy record and not duplicate it
+    assert data["incidents_created"] == 0
+    assert data["incidents_already_existing"] == 1
+

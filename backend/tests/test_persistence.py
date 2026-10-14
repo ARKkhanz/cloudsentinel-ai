@@ -271,3 +271,181 @@ def test_incident_model_persistence(db_session: Session):
     assert retrieved.severity == "critical"
     assert retrieved.observed_metric_evidence["observed_value"] == 312.4
     assert retrieved.baseline_evidence["baseline_mean"] == 42.1
+
+
+def test_init_db_fresh_database():
+    """Verify fresh database initialization creates all tables and required indexes."""
+    from backend.app.db.session import init_db
+    from sqlalchemy import inspect
+
+    test_eng = create_engine("sqlite:///:memory:")
+    init_db(target_engine=test_eng)
+
+    inspector = inspect(test_eng)
+    tables = inspector.get_table_names()
+    assert "metric_samples" in tables
+    assert "incidents" in tables
+
+    incident_cols = {c["name"] for c in inspector.get_columns("incidents")}
+    assert "metric_sample_id" in incident_cols
+    assert "dedup_key" in incident_cols
+
+    incident_indexes = {idx["name"] for idx in inspector.get_indexes("incidents")}
+    assert "ix_incidents_dedup_key" in incident_indexes
+
+
+def test_init_db_upgrade_from_earlier_schema():
+    """
+    Verify upgrade from earlier schema missing 'metric_sample_id' and 'dedup_key'.
+    Ensures existing historical records remain intact and columns + unique index are added safely.
+    """
+    from backend.app.db.session import init_db
+    from sqlalchemy import inspect, text
+
+    test_eng = create_engine("sqlite:///:memory:")
+    with test_eng.connect() as conn:
+        # Create earlier legacy incidents table without metric_sample_id or dedup_key
+        conn.execute(text("""
+            CREATE TABLE incidents (
+                id VARCHAR(36) PRIMARY KEY,
+                service VARCHAR(100) NOT NULL,
+                created_at TIMESTAMP NOT NULL,
+                severity VARCHAR(20) NOT NULL,
+                status VARCHAR(20) NOT NULL,
+                detector_name VARCHAR(50) NOT NULL,
+                detector_version VARCHAR(20) NOT NULL,
+                summary VARCHAR(255) NOT NULL,
+                explanation TEXT NOT NULL,
+                observed_metric_evidence JSON NOT NULL,
+                baseline_evidence JSON NOT NULL,
+                window_start TIMESTAMP NOT NULL,
+                window_end TIMESTAMP NOT NULL
+            )
+        """))
+        conn.execute(text("""
+            INSERT INTO incidents (
+                id, service, created_at, severity, status, detector_name,
+                detector_version, summary, explanation, observed_metric_evidence,
+                baseline_evidence, window_start, window_end
+            ) VALUES (
+                'legacy-inc-1', 'auth-service', '2026-10-14 10:00:00', 'warning', 'open',
+                'threshold_baseline', '1.0.0', 'Legacy incident', 'Details', '{}', '{}',
+                '2026-10-14 10:00:00', '2026-10-14 10:00:00'
+            )
+        """))
+        conn.commit()
+
+    # Run init_db schema synchronization
+    init_db(target_engine=test_eng)
+
+    # Inspect schema
+    inspector = inspect(test_eng)
+    incident_cols = {c["name"] for c in inspector.get_columns("incidents")}
+    assert "metric_sample_id" in incident_cols
+    assert "dedup_key" in incident_cols
+
+    incident_indexes = {idx["name"] for idx in inspector.get_indexes("incidents")}
+    assert "ix_incidents_dedup_key" in incident_indexes
+
+    # Verify historical data preserved intact
+    with test_eng.connect() as conn:
+        row = conn.execute(text("SELECT id, service, summary, metric_sample_id, dedup_key FROM incidents WHERE id = 'legacy-inc-1'")).fetchone()
+        assert row is not None
+        assert row[0] == "legacy-inc-1"
+        assert row[1] == "auth-service"
+        assert row[2] == "Legacy incident"
+        assert row[3] is None  # metric_sample_id defaults to NULL safely
+        assert row[4] is None  # dedup_key defaults to NULL safely
+
+
+def test_init_db_repeated_initialization_is_idempotent():
+    """Verify repeated calls to init_db do not fail or duplicate objects."""
+    from backend.app.db.session import init_db
+
+    test_eng = create_engine("sqlite:///:memory:")
+    init_db(target_engine=test_eng)
+    # Second call should complete safely without errors
+    init_db(target_engine=test_eng)
+    # Third call
+    init_db(target_engine=test_eng)
+
+
+def test_init_db_ensures_unique_index_when_columns_already_exist():
+    """Verify that if columns exist but unique index is missing, init_db creates it."""
+    from backend.app.db.session import init_db
+    from sqlalchemy import inspect, text
+
+    test_eng = create_engine("sqlite:///:memory:")
+    with test_eng.connect() as conn:
+        conn.execute(text("""
+            CREATE TABLE incidents (
+                id VARCHAR(36) PRIMARY KEY,
+                service VARCHAR(100) NOT NULL,
+                created_at TIMESTAMP NOT NULL,
+                severity VARCHAR(20) NOT NULL,
+                status VARCHAR(20) NOT NULL,
+                detector_name VARCHAR(50) NOT NULL,
+                detector_version VARCHAR(20) NOT NULL,
+                summary VARCHAR(255) NOT NULL,
+                explanation TEXT NOT NULL,
+                observed_metric_evidence JSON NOT NULL,
+                baseline_evidence JSON NOT NULL,
+                window_start TIMESTAMP NOT NULL,
+                window_end TIMESTAMP NOT NULL,
+                metric_sample_id INTEGER,
+                dedup_key VARCHAR(160)
+            )
+        """))
+        conn.commit()
+
+    # Pre-check: index does NOT exist
+    inspector_before = inspect(test_eng)
+    indexes_before = {idx["name"] for idx in inspector_before.get_indexes("incidents")}
+    assert "ix_incidents_dedup_key" not in indexes_before
+
+    # Run init_db
+    init_db(target_engine=test_eng)
+
+    inspector_after = inspect(test_eng)
+    indexes_after = {idx["name"] for idx in inspector_after.get_indexes("incidents")}
+    assert "ix_incidents_dedup_key" in indexes_after
+
+
+def test_init_db_observable_failure_on_incompatible_schema():
+    """Verify that init_db does not silently conceal schema failures (e.g. duplicate keys when creating unique index)."""
+    from backend.app.db.session import init_db
+    from sqlalchemy import text
+
+    test_eng = create_engine("sqlite:///:memory:")
+    with test_eng.connect() as conn:
+        conn.execute(text("""
+            CREATE TABLE incidents (
+                id VARCHAR(36) PRIMARY KEY,
+                service VARCHAR(100) NOT NULL,
+                created_at TIMESTAMP NOT NULL,
+                severity VARCHAR(20) NOT NULL,
+                status VARCHAR(20) NOT NULL,
+                detector_name VARCHAR(50) NOT NULL,
+                detector_version VARCHAR(20) NOT NULL,
+                summary VARCHAR(255) NOT NULL,
+                explanation TEXT NOT NULL,
+                observed_metric_evidence JSON NOT NULL,
+                baseline_evidence JSON NOT NULL,
+                window_start TIMESTAMP NOT NULL,
+                window_end TIMESTAMP NOT NULL,
+                metric_sample_id INTEGER,
+                dedup_key VARCHAR(160)
+            )
+        """))
+        # Insert duplicate dedup_key values which will violate unique index creation
+        conn.execute(text("""
+            INSERT INTO incidents VALUES 
+            ('id-1', 's', '2026-10-14', 'c', 'o', 'd', '1', 'sum1', 'exp', '{}', '{}', '2026-10-14', '2026-10-14', 1, 'conflict-key'),
+            ('id-2', 's', '2026-10-14', 'c', 'o', 'd', '1', 'sum2', 'exp', '{}', '{}', '2026-10-14', '2026-10-14', 2, 'conflict-key')
+        """))
+        conn.commit()
+
+    # Running init_db must raise an exception rather than silently suppressing it
+    with pytest.raises(Exception):
+        init_db(target_engine=test_eng)
+

@@ -21,6 +21,7 @@ Developed as a four-day engineering project following the *CloudSentinel AI Impl
   - [x] **Milestone 3**: Transparent threshold baseline anomaly detector (`ThresholdDetector`)
   - [x] **Milestone 4**: Multivariate `IsolationForest` anomaly detector with Scikit-Learn
   - [x] **Milestone 5**: Incident generation, evidence preservation, deduplication, FastAPI APIs, and React dashboard integration
+  - [x] **Milestone 6**: Reproducible ML evaluation, reliability hardening (schema migration logging & SHA-256 fingerprint deduplication), comprehensive documentation, and final Day 2 verification
 - **Day 3: Quality, Docker & GitHub Actions CI** *(Planned)*
 - **Day 4: End-to-End Verification, Documentation & Demo** *(Planned)*
 
@@ -29,7 +30,7 @@ Developed as a four-day engineering project following the *CloudSentinel AI Impl
 ## Notice on Telemetry & Prototype Scope
 All metric observations ingested and displayed by CloudSentinel AI are **strictly synthetic** and generated deterministically with isolated random seeds and explicit UTC reference timestamps.
 
-CloudSentinel AI is a portfolio-grade reliability engineering prototype. It provides factual mathematical evidence (threshold boundaries and IsolationForest decision scores) and does NOT claim automated root-cause diagnosis or production monitoring.
+CloudSentinel AI is a portfolio-grade reliability engineering prototype. It provides factual mathematical evidence (threshold boundaries and IsolationForest decision scores) and does **NOT** claim automated root-cause diagnosis, production monitoring, or outage forecasting.
 
 ---
 
@@ -42,7 +43,8 @@ CloudSentinel AI is a portfolio-grade reliability engineering prototype. It prov
 | **Persistence** | SQLite + SQLAlchemy 2.x | ACID persistence for metric samples and deduplicated incident evidence snapshots |
 | **Machine Learning** | Scikit-Learn (IsolationForest) + NumPy | Unsupervised multivariate anomaly detection with reproducible random seeds |
 | **Validation** | Pydantic v2 | Strict request validation, response serialization, and timestamp normalization |
-| **Testing** | pytest + TestClient + Google Chrome CDP | 96-test automated backend suite + 11-test real Google Chrome browser QA journey |
+| **Evaluation** | Standalone Benchmark Script | Confusion matrices, Precision, Recall, F1-Score, and False-Positive Rate calculations |
+| **Testing** | pytest + TestClient + Google Chrome CDP | 114-test automated backend suite + 11-test real Google Chrome browser QA journey |
 | **Version Control** | Git + GitHub CLI | Checked-in milestones, verified commits on GitHub `main` branch |
 
 ---
@@ -86,28 +88,34 @@ cloudsentinel-ai/
 │   │   ├── services/
 │   │   │   ├── metric_generator.py  # Seeded telemetry generator
 │   │   │   ├── anomaly_generator.py # Controlled anomaly injector with ground truth
-│   │   │   └── incident_service.py  # Service layer: detection, deduplication, persistence
+│   │   │   └── incident_service.py  # Service layer: detection, SHA-256 fingerprint dedup, persistence
 │   │   ├── db/
 │   │   │   ├── base.py           # DeclarativeBase
-│   │   │   └── session.py        # SQLite engine, SessionLocal, and init_db() sync
+│   │   │   └── session.py        # SQLite engine, SessionLocal, and hardened init_db() sync
 │   │   ├── config.py             # Settings, CORS origins, and SQLite database path
 │   │   └── main.py               # FastAPI application factory and router registration
+│   ├── scripts/
+│   │   └── evaluate_detectors.py # Reproducible detector benchmark evaluation script
 │   ├── tests/
 │   │   ├── conftest.py           # In-memory SQLite fixtures and test clients
 │   │   ├── test_health.py        # Health route tests (3 tests)
 │   │   ├── test_metrics.py       # Telemetry route tests (15 tests)
-│   │   ├── test_persistence.py   # Database lifecycle tests (6 tests)
+│   │   ├── test_persistence.py   # Database lifecycle and schema migration tests (11 tests)
 │   │   ├── test_demo_generation.py # Anomaly injection tests (15 tests)
 │   │   ├── test_threshold_detector.py # Threshold detector tests (18 tests)
 │   │   ├── test_ml_detector.py   # IsolationForest detector tests (18 tests)
-│   │   ├── test_incidents.py     # Incident generation & deduplication tests (21 tests)
+│   │   ├── test_incidents.py     # Incident generation & fingerprint deduplication tests (25 tests)
+│   │   ├── test_evaluation.py    # Metric mathematics & benchmark reproducibility tests (9 tests)
 │   │   ├── automated_browser_qa.py   # Day 1 Chrome CDP browser runner (29 tests)
-│   │   └── milestone5_browser_qa.py  # Day 2 Milestone 5 Chrome CDP runner (11 tests)
+│   │   ├── milestone5_browser_qa.py  # Day 2 Milestone 5 Chrome CDP runner (11 tests)
+│   │   └── milestone6_browser_qa.py  # Day 2 Milestone 6 Chrome CDP runner (11 tests)
 │   └── requirements.txt          # Python dependencies
 ├── docs/
-│   ├── learning-notes.md         # Comprehensive engineering & learning guide
+│   ├── learning-notes.md         # Comprehensive Day 1 & Day 2 engineering and learning notes
+│   ├── experiment-results.md     # Full empirical evaluation report with confusion matrices and analysis
 │   ├── day1_automated_browser_qa_report.md     # Day 1 browser QA report
 │   ├── milestone5_browser_qa_report.md # Milestone 5 browser QA report
+│   ├── milestone6_browser_qa_report.md # Milestone 6 browser QA report
 │   └── screenshots/              # Real browser visual proof captures
 ├── .env.example                  # Root environment template
 ├── .gitignore                    # Python, Node, OS, and secret exclusion rules
@@ -132,7 +140,7 @@ cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai
 # Activate virtual environment
 .\backend\.venv\Scripts\Activate.ps1
 
-# Run FastAPI backend service
+# Run FastAPI backend service from repository root
 .\backend\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 ```
 FastAPI runs at `http://127.0.0.1:8000`. Swagger documentation is available at `http://127.0.0.1:8000/docs`.
@@ -150,13 +158,44 @@ Dashboard is served at `http://127.0.0.1:5173`.
 
 ---
 
+## Reproducible Machine Learning Evaluation
+
+To run the reproducible benchmark comparing `ThresholdDetector` and `IsolationForestDetector` against held-out telemetry:
+
+```powershell
+cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai
+.\backend\.venv\Scripts\python.exe backend/scripts/evaluate_detectors.py
+```
+
+### Benchmark Summary (Seed 100 Train, Seed 42 Held-out Eval)
+
+| Metric | Threshold Baseline | IsolationForest |
+| :--- | :---: | :---: |
+| **Evaluated Samples** | 100 | 100 |
+| **Ground-Truth Anomalies** | 5 | 5 |
+| **Predicted Anomalies** | 5 | 5 |
+| **True Positives (TP)** | 5 | 4 |
+| **False Positives (FP)** | 0 | 1 |
+| **True Negatives (TN)** | 95 | 94 |
+| **False Negatives (FN)** | 0 | 1 |
+| **Precision** | **1.0000 (100.0%)** | **0.8000 (80.0%)** |
+| **Recall** | **1.0000 (100.0%)** | **0.8000 (80.0%)** |
+| **F1 Score** | **1.0000** | **0.8000** |
+| **False-Positive Rate** | **0.0000 (0.00%)** | **0.0105 (1.05%)** |
+
+Detailed scientific analysis, confusion matrices, and qualitative false-positive/negative breakdown are available in [`docs/experiment-results.md`](docs/experiment-results.md).
+
+---
+
 ## API Endpoints Specification
 
 ### 1. `GET /health`
 Readiness probe returning backend health and database connectivity.
 
 ### 2. `GET /api/metrics`
-Retrieve persisted or synthetic metrics ordered descending by timestamp.
+Retrieve persisted metrics ordered descending by timestamp.
+* Query parameters: `service` (default `demo-api`), `limit` (default 50, max 200).
+* *Note on Display Limit*: When generating 100 demo observations, the dashboard fetches and displays the most recent 50 observations in the table by default to maintain responsive UI rendering, while all 100 samples are stored in SQLite and evaluated by detectors.
 
 ### 3. `POST /api/demo/generate`
 Generate and persist reproducible synthetic telemetry with controlled anomaly injections.
@@ -173,7 +212,7 @@ Generate and persist reproducible synthetic telemetry with controlled anomaly in
   ```
 
 ### 4. `POST /api/detection/run`
-Execute anomaly detection pipeline against persisted metrics in SQLite.
+Execute anomaly detection pipeline against persisted metrics in SQLite with SHA-256 fingerprint deduplication.
 * **Supported Detectors**:
   * `"threshold_baseline"`: Evaluates against latency (>150ms) and error rate (>5%) boundaries.
   * `"isolation_forest"`: Evaluates multivariate metrics with IsolationForest fitted on clean reference baseline (Seed 100, 100 samples).
@@ -197,52 +236,54 @@ Retrieve complete persisted incident information including observed measurements
 
 ## Verification & Testing Suite
 
-### 1. Backend pytest Suite (96 Tests, 100% Pass)
+### 1. Backend pytest Suite (114 Tests, 100% Pass)
 ```powershell
 cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai
 .\backend\.venv\Scripts\python.exe -m pytest -v
 ```
-*Result*: **96 passed, 0 failed** in ~8.3s across all 7 test modules.
+*Result*: **114 passed, 0 failed** in ~13.1s across all 8 test modules.
 
 ### 2. Frontend Production Build
 ```powershell
 cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai\frontend
 npm run build
 ```
-*Result*: TypeScript compilation check (`tsc -b`) and Vite production bundle passed in 1.07s.
+*Result*: TypeScript compilation check (`tsc -b`) and Vite production bundle passed in 1.02s.
 
 ### 3. Real Google Chrome Automated Browser QA
 ```powershell
 cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai
-.\backend\.venv\Scripts\python.exe backend\tests\milestone5_browser_qa.py
+.\backend\.venv\Scripts\python.exe backend\tests\milestone6_browser_qa.py
 ```
 *Result*: **11/11 PASSED (100%)** in Google Chrome via Chrome DevTools Protocol (CDP):
 * Initial health connection verification.
 * Synthetic telemetry generation with 5 injected anomalies.
-* KPI cards and observations table updates.
+* KPI cards and observations table updates (50 rows displayed, 100 in SQLite).
 * Threshold detection execution and incident table populating.
 * Threshold incident evidence modal inspection (measurements vs rules).
 * IsolationForest detection execution and multivariate incident populating.
 * IsolationForest evidence modal inspection (decision score & model parameters).
-* Duplicate prevention on repeated detection run (0 new incidents created).
+* Duplicate prevention on repeated detection run (0 new incidents created via SHA-256 fingerprinting).
 * Browser reload and state persistence from SQLite.
-* Mobile viewport (390×844) responsive layout check.
+* Mobile viewport (375×667) responsive layout check.
 * Console error audit (0 errors) and network check (0 failed requests).
 
 **Captured Visual Evidence:**
-* Report: [`docs/milestone5_browser_qa_report.md`](docs/milestone5_browser_qa_report.md)
-* Initial Dashboard State: [`docs/screenshots/milestone5_01_initial_state.png`](docs/screenshots/milestone5_01_initial_state.png)
-* Generated Metrics: [`docs/screenshots/milestone5_02_metrics_generated.png`](docs/screenshots/milestone5_02_metrics_generated.png)
-* Threshold Incidents: [`docs/screenshots/milestone5_03_threshold_incidents.png`](docs/screenshots/milestone5_03_threshold_incidents.png)
-* Threshold Evidence Modal: [`docs/screenshots/milestone5_04_threshold_evidence_modal.png`](docs/screenshots/milestone5_04_threshold_evidence_modal.png)
-* IsolationForest Evidence Modal: [`docs/screenshots/milestone5_05_ml_evidence_modal.png`](docs/screenshots/milestone5_05_ml_evidence_modal.png)
-* Mobile Responsive Viewport: [`docs/screenshots/milestone5_06_mobile_responsive.png`](docs/screenshots/milestone5_06_mobile_responsive.png)
-* Full Persisted Dashboard: [`docs/screenshots/milestone5_07_full_dashboard.png`](docs/screenshots/milestone5_07_full_dashboard.png)
+* Report: [`docs/milestone6_browser_qa_report.md`](docs/milestone6_browser_qa_report.md)
+* Initial Dashboard State: [`docs/screenshots/milestone6_01_initial_dashboard.png`](docs/screenshots/milestone6_01_initial_dashboard.png)
+* Generated Metrics: [`docs/screenshots/milestone6_02_metrics_generated.png`](docs/screenshots/milestone6_02_metrics_generated.png)
+* Threshold Incidents: [`docs/screenshots/milestone6_03_threshold_detection.png`](docs/screenshots/milestone6_03_threshold_detection.png)
+* Threshold Evidence Modal: [`docs/screenshots/milestone6_04_threshold_evidence_modal.png`](docs/screenshots/milestone6_04_threshold_evidence_modal.png)
+* IsolationForest Detection: [`docs/screenshots/milestone6_05_isolation_forest_detection.png`](docs/screenshots/milestone6_05_isolation_forest_detection.png)
+* IsolationForest Evidence Modal: [`docs/screenshots/milestone6_06_ml_evidence_modal.png`](docs/screenshots/milestone6_06_ml_evidence_modal.png)
+* Persisted Across Reload: [`docs/screenshots/milestone6_07_persisted_after_reload.png`](docs/screenshots/milestone6_07_persisted_after_reload.png)
+* Mobile Responsive Viewport: [`docs/screenshots/milestone6_08_mobile_responsive.png`](docs/screenshots/milestone6_08_mobile_responsive.png)
 
 ---
 
-## Known Limitations & Milestone 6 Roadmap
+## Known Limitations
 
-* **Reference Baseline Training**: IsolationForest is fitted on a deterministic clean baseline generated from Seed 100 with zero injected anomalies. Formal comparative evaluation (precision, recall, F1-score) will be executed in Milestone 6.
+* **Synthetic Data Prototype**: All telemetry is synthetically generated to demonstrate detection principles and evidence workflows without cloud infrastructure dependencies.
 * **No Root Cause Diagnosis**: Anomaly detection identifies statistical outliers and does not infer root causes.
-* **Single Service Focus**: Default configuration focuses on `demo-api`. Multi-service cross-correlation is planned for future milestones.
+* **Contamination Prior**: The contamination parameter in IsolationForest is a modeling assumption (outlier budget), not an empirical ground-truth rate.
+* **Static Thresholds**: Threshold rules require operational tuning and do not adapt dynamically to evolving traffic baselines.

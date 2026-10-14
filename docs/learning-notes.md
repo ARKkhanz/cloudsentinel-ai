@@ -168,10 +168,67 @@ Detectors strictly reject missing timestamps (`timestamp=None`) and normalize al
 
 ---
 
+### 2.11 Database Schema Migration & Observable Error Propagation
+In earlier iterations, database schema initialization wrapped table alterations in broad exception suppression (`except Exception: pass`). This presented a critical reliability defect where failed schema migrations could pass silently.
+
+In Milestone 6, `init_db()` was refactored:
+1. **Observable Failure**: Silent suppression was removed. Operational failures (e.g. database locks, read-only media, disk full, or unique index integrity conflicts) are logged with full stack traces via Python `logging` and re-raised (`raise`).
+2. **Idempotent Synchronization**: Using SQLAlchemy's `inspect()`, existing columns and indexes are examined before applying schema changes. Missing columns (`metric_sample_id`, `dedup_key`) are added safely via `ALTER TABLE ... ADD COLUMN ...`.
+3. **Index Verification**: Even if columns existed from previous migrations, the unique index `ix_incidents_dedup_key` is verified and created idempotently using `CREATE UNIQUE INDEX IF NOT EXISTS`.
+4. **Data Preservation**: Existing incident records and telemetry are preserved intact during migrations without table recreation or truncation.
+
+---
+
+### 2.12 Hardened Deduplication via SHA-256 Metric Fingerprinting
+The previous deduplication key format was:
+`service:detector_name:observation_timestamp`
+
+While effective for identical telemetry runs, this key suppressed genuinely new findings if synthetic demo batches were regenerated with different numerical telemetry at the same timestamps.
+
+To resolve this edge case, Milestone 6 implemented canonical SHA-256 fingerprinting:
+1. **Identity Vector**:
+   $$\text{Payload} = \text{service} \parallel \text{detector:version} \parallel \text{config} \parallel \text{UTC timestamp} \parallel \text{sorted canonical metrics}$$
+2. **Fixed Numerical Formatting**: Float values are formatted to stable precision (`latency_ms` to 4 decimal places, `request_count` as an integer) to avoid representation jitter across serialization boundaries.
+3. **Compact Key**: The key is formatted as `f"{service}:{detector_name}:{sha256[:32]}"`, remaining compact (< 60 chars) and optimal for SQLite indexes.
+4. **Backward Compatibility**: Pre-existing historical incidents created with legacy keys (`service:detector:iso_timestamp`) are cross-referenced with stored metric evidence so historical incidents are preserved without unnecessary duplication.
+5. **Safe Concurrency Conflict Handling**: If concurrent processes attempt duplicate insertion, SQLite's unique constraint raises `IntegrityError`. The transaction is rolled back safely, non-conflicting incidents are committed individually, and `incidents_already_existing` is reported without exposing unhandled HTTP 500 errors.
+
+---
+
+### 2.13 Reproducible ML Evaluation & Metric Formulation
+Evaluating anomaly detectors against synthetic benchmarks requires strict mathematical formulation and zero leakage:
+1. **Training/Evaluation Isolation**:
+   - Clean Training: Seed `100`, 100 samples, 0 anomalies injected.
+   - Evaluation Set: Seed `42`, 100 samples, 5 injected anomalies (3 latency spikes, 2 error rate surges).
+2. **Zero Leakage**: Feature vectors strictly exclude ground-truth anomaly labels, synthetic flags, timestamps, and database IDs.
+3. **Formulas**:
+   - $\text{Precision} = \frac{\text{TP}}{\text{TP} + \text{FP}}$ (handles division by zero safely by returning 0.0)
+   - $\text{Recall} = \frac{\text{TP}}{\text{TP} + \text{FN}}$
+   - $\text{F1} = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}$
+   - $\text{FPR} = \frac{\text{FP}}{\text{FP} + \text{TN}}$
+   - Confusion Sum Check: $\text{TP} + \text{FP} + \text{TN} + \text{FN} = \text{Total Samples} (100)$
+
+---
+
+### 2.14 Comparative Insights: Threshold vs. IsolationForest
+Empirical evaluation demonstrated key operational trade-offs:
+1. **Threshold Baseline ($F_1 = 1.0$)**:
+   - Outperformed ML on this benchmark because the synthetic generator injects massive single-metric spikes ($>20$ standard deviations above baseline).
+   - When operational rules are tuned to target known, severe univariate shocks, threshold rules achieve perfect precision and recall with zero training cost.
+2. **IsolationForest ($F_1 = 0.80$)**:
+   - Successfully isolated 4 of 5 ground-truth anomalies in 5-dimensional subspace without access to labels or business rules.
+   - **False Positive (Index 28)**: Flagged an observation with unusually low latency (31.88ms) and high request count (152). While operationally healthy, this rare coordinate combination fell into a sparse subspace.
+   - **Contamination is an Assumption, Not Ground Truth**: Setting `contamination=0.05` enforces an arbitrary outlier budget of 5 samples. It does not reflect empirical reality.
+   - **Anomaly Score is NOT Outage Probability**: A negative decision score (e.g. $-0.0373$) indicates geometric isolation path length, not a probability of service failure.
+
+---
+
 ## 3. Automated Verification Summary
 
 | Suite | Scope | Result | Execution Time |
 | :--- | :--- | :---: | :---: |
-| **Pytest Backend Suite** | 7 test files (Health, Metrics, Persistence, Demo Gen, Threshold, ML, Incidents) | **96 passed, 0 failed** | ~8.3s |
-| **Frontend Production Build** | TypeScript compiler check (`tsc -b`) & Vite bundler | **Pass** (0 errors) | ~1.1s |
-| **Real Chrome Browser QA** | 11 automated CDP steps (Connection, Generation, Threshold, ML, Evidence, Dedup, Persistence, Mobile) | **11 passed, 0 failed** | ~23s |
+| **Pytest Backend Suite** | 8 test modules (Health, Metrics, Persistence, Demo Gen, Threshold, ML, Incidents, Evaluation) | **114 passed, 0 failed** | ~13.1s |
+| **Frontend Production Build** | TypeScript compiler check (`tsc -b`) & Vite bundler | **Pass** (0 errors) | ~1.0s |
+| **Reproducible ML Benchmark** | Standalone benchmark runner (`backend/scripts/evaluate_detectors.py`) | **Reproduced** (100 samples) | ~0.6s |
+| **Real Chrome Browser QA** | 11 automated CDP steps (Connection, Generation, Threshold, ML, Evidence, Dedup, Persistence, Mobile) | **11 passed, 0 failed** | ~24s |
+
