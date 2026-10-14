@@ -1,0 +1,140 @@
+name: CloudSentinel AI CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    name: Backend Unit Tests & ML Evaluation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "backend/requirements.txt"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run backend pytest suite (114 tests)
+        run: |
+          python -m pytest -v
+
+      - name: Run detector evaluation benchmark
+        run: |
+          python backend/scripts/evaluate_detectors.py
+
+  frontend-checks:
+    name: Frontend Lint & Production Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: "frontend/package-lock.json"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Run TypeScript & Vite production build
+        working-directory: frontend
+        run: npm run build
+
+  docker-integration:
+    name: Docker Compose Integration & Persistence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Inspect Docker environment
+        run: |
+          docker --version
+          docker compose version
+          docker info
+          docker compose config --quiet
+          echo "Docker Compose configuration is valid."
+
+      - name: Build Docker images
+        run: |
+          docker compose build
+
+      - name: Start multi-container application
+        run: |
+          docker compose up -d
+
+      - name: Wait for backend service health
+        run: |
+          echo "Waiting for backend service to report healthy on port 8000..."
+          for i in {1..30}; do
+            if curl -s -f http://localhost:8000/health > /dev/null; then
+              echo "Backend is healthy after ${i} attempts."
+              break
+            fi
+            echo "Waiting for health check... ($i/30)"
+            sleep 2
+          done
+          curl -i http://localhost:8000/health || (docker compose logs backend && exit 1)
+
+      - name: Inspect running containers
+        run: |
+          docker compose ps
+
+      - name: Verify direct and proxied endpoints via curl
+        run: |
+          echo "Testing direct backend health (port 8000)..."
+          curl -i -s -f http://localhost:8000/health
+          echo -e "\nTesting proxied health via Nginx (port 3000)..."
+          curl -i -s -f http://localhost:3000/health
+          echo -e "\nTesting frontend SPA root HTML..."
+          curl -i -s -f http://localhost:3000/ | grep -i "doctype html"
+          echo -e "\nTesting initial metrics endpoint via Nginx..."
+          curl -i -s -f "http://localhost:3000/api/metrics?service=demo-api&limit=5"
+
+      - name: Execute end-to-end integration and persistence verification
+        run: |
+          python backend/scripts/verify_docker_integration.py
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          echo "=== CONTAINER STATUS ==="
+          docker compose ps
+          echo "=== BACKEND LOGS ==="
+          docker compose logs backend --tail=100
+          echo "=== FRONTEND LOGS ==="
+          docker compose logs frontend --tail=100
+
+      - name: Teardown containers and clean up volumes
+        if: always()
+        run: |
+          docker compose down -v
