@@ -1,0 +1,176 @@
+[
+  {
+    "name": "P1_Dashboard_Render",
+    "status": "PASS",
+    "observation": "React app rendered inside Google Chrome",
+    "evidence": "Title: 'CloudSentinel AI \u2014 Reliability Dashboard', Root container present."
+  },
+  {
+    "name": "P2_Brand_Title",
+    "status": "PASS",
+    "observation": "Brand title rendered: 'CloudSentinel AI'",
+    "evidence": ""
+  },
+  {
+    "name": "P2_Synthetic_Badge",
+    "status": "PASS",
+    "observation": "Synthetic badge visible: 'SYNTHETIC DEMO TELEMETRY'",
+    "evidence": ""
+  },
+  {
+    "name": "P2_Health_Badge_Online",
+    "status": "PASS",
+    "observation": "Health badge state: 'BACKEND: ONLINE (CLOUDSENTINEL-BACKEND V0.1.0)' (healthy class: True)",
+    "evidence": ""
+  },
+  {
+    "name": "P2_Cards_Count",
+    "status": "PASS",
+    "observation": "Rendered 5 KPI cards",
+    "evidence": ""
+  },
+  {
+    "name": "P2_Card_Service",
+    "status": "PASS",
+    "observation": "Service card value: 'demo-api'",
+    "evidence": ""
+  },
+  {
+    "name": "P2_Card_Avg_Latency",
+    "status": "PASS",
+    "observation": "DOM value 43.12 ms vs Calculated 43.12 ms (diff: 0.001)",
+    "evidence": ""
+  },
+  {
+    "name": "P2_Card_Avg_ErrorRate",
+    "status": "PASS",
+    "observation": "DOM value 0.55% vs Calculated 0.55% (diff: 0.003)",
+    "evidence": ""
+  },
+  {
+    "name": "P2_Card_Total_Requests",
+    "status": "PASS",
+    "observation": "DOM value 6,150 vs Calculated 6,150",
+    "evidence": ""
+  },
+  {
+    "name": "P2_Card_Resources",
+    "status": "PASS",
+    "observation": "DOM value: '28.8% / 44.5%' vs Calculated: '28.8% / 44.5%'",
+    "evidence": ""
+  },
+  {
+    "name": "P2_Table_Rows_Count",
+    "status": "PASS",
+    "observation": "Rendered 50 table rows (expected 50)",
+    "evidence": ""
+  },
+  {
+    "name": "P2_Table_Synthetic_Tags",
+    "status": "PASS",
+    "observation": "Found 50 SYNTHETIC tags in table",
+    "evidence": ""
+  },
+  {
+    "name": "P2_Table_Timestamp_Order",
+    "status": "PASS",
+    "observation": "First row: '2026-10-14 12:00:00 UTC' >= Last row: '2026-10-14 11:11:00 UTC' (Order: Descending)",
+    "evidence": ""
+  },
+  {
+    "name": "P3_Console_Zero_Errors",
+    "status": "PASS",
+    "observation": "0 console errors, 0 uncaught exceptions",
+    "evidence": ""
+  },
+  {
+    "name": "P3_Network_Health_200",
+    "status": "PASS",
+    "observation": "Observed 2 /health responses (Status 200 confirmed)",
+    "evidence": ""
+  },
+  {
+    "name": "P3_Network_Metrics_200",
+    "status": "PASS",
+    "observation": "Observed 2 /api/metrics responses (Status 200 confirmed)",
+    "evidence": ""
+  },
+  {
+    "name": "P4_Refresh_In_Place",
+    "status": "PASS",
+    "observation": "Page URL unchanged (http://127.0.0.1:5173/) - No full page reload",
+    "evidence": ""
+  },
+  {
+    "name": "P4_Refresh_Network_Dispatched",
+    "status": "PASS",
+    "observation": "Dispatched 2 new network responses upon click",
+    "evidence": ""
+  },
+  {
+    "name": "P4_Refresh_Data_Intact",
+    "status": "PASS",
+    "observation": "Table retains 50 rows after refresh",
+    "evidence": ""
+  },
+  {
+    "name": "P5_Offline_Badge_Displayed",
+    "status": "PASS",
+    "observation": "Offline badge: 'BACKEND: OFFLINE'",
+    "evidence": ""
+  },
+  {
+    "name": "P5_Error_Banner_Displayed",
+    "status": "PASS",
+    "observation": "Error banner title: 'Backend Connection Lost \u2014 Displaying Stale Cached Telemetry'",
+    "evidence": ""
+  },
+  {
+    "name": "P5_Stale_Data_Explicit_Labeling",
+    "status": "PASS",
+    "observation": "Stale badge rendered: 'STALE CACHED DATA'",
+    "evidence": ""
+  },
+  {
+    "name": "P6_Backend_Restart",
+    "status": "PASS",
+    "observation": "FastAPI recovered and responds with HTTP 200 on /health",
+    "evidence": ""
+  },
+  {
+    "name": "P6_Recovery_Online_Badge",
+    "status": "PASS",
+    "observation": "Recovered health badge: 'BACKEND: ONLINE (CLOUDSENTINEL-BACKEND V0.1.0)'",
+    "evidence": ""
+  },
+  {
+    "name": "P6_Recovery_Error_Banner_Dismissed",
+    "status": "PASS",
+    "observation": "Error banner smoothly dismissed upon successful reconnection",
+    "evidence": ""
+  },
+  {
+    "name": "P6_Recovery_Rows_Restored",
+    "status": "PASS",
+    "observation": "Restored telemetry table with 50 rows",
+    "evidence": ""
+  },
+  {
+    "name": "P7_Viewport_Desktop_1440x900",
+    "status": "PASS",
+    "observation": "No horizontal overflow: True, 5 cards visible: True, Table responsive: True",
+    "evidence": "Screenshot: docs/screenshots/desktop_1440x900.png"
+  },
+  {
+    "name": "P7_Viewport_Tablet_768x1024",
+    "status": "PASS",
+    "observation": "No horizontal overflow: True, 5 cards visible: True, Table responsive: True",
+    "evidence": "Screenshot: docs/screenshots/tablet_768x1024.png"
+  },
+  {
+    "name": "P7_Viewport_Mobile_390x844",
+    "status": "PASS",
+    "observation": "No horizontal overflow: True, 5 cards visible: True, Table responsive: True",
+    "evidence": "Screenshot: docs/screenshots/mobile_390x844.png"
+  }
+]

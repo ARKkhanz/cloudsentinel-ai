@@ -76,10 +76,18 @@ cloudsentinel-ai/
 │   │   ├── conftest.py           # Pytest TestClient fixture
 │   │   ├── test_health.py        # Health route, status code, and CORS unit tests
 │   │   ├── test_metrics.py       # Metrics validation, schema, order, and determinism tests
-│   │   └── verify_milestone4_integration.py # Live Uvicorn socket & lifecycle test script
+│   │   ├── verify_milestone4_integration.py # Live Uvicorn socket & lifecycle test script
+│   │   └── automated_browser_qa.py # Automated Chrome DevTools Protocol (CDP) test runner
 │   └── requirements.txt          # Python dependencies
 ├── docs/
-│   └── learning-notes.md         # Architecture, request flow, and comprehension guide
+│   ├── learning-notes.md         # Architecture, request flow, and comprehension guide
+│   ├── day1_automated_browser_qa_report.md # Full 29-test automated browser QA report
+│   └── screenshots/              # Real browser QA screenshots & machine-readable JSON
+│       ├── desktop_1440x900.png  # Desktop layout capture
+│       ├── tablet_768x1024.png   # Tablet layout capture
+│       ├── mobile_390x844.png    # Mobile layout capture
+│       ├── offline_stale_state.png # Outage & stale data handling capture
+│       └── qa_results.json       # Structured 29-test CDP results
 ├── .env.example                  # Root environment template (no secrets)
 ├── .gitignore                    # Python, Node, OS, and secret exclusion rules
 └── README.md                     # Project documentation
@@ -195,7 +203,29 @@ cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai
 cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai\frontend
 npm run build
 ```
-*Current Result*: TypeScript compiler check (`tsc -b`) and Vite production bundling passed with zero errors.
+*Current Result*: TypeScript compiler check (`tsc -b`) and Vite production bundling passed with zero errors (`150.26 kB` bundle built in 1.24s).
+
+### Run Automated Browser QA Suite (Google Chrome CDP)
+```powershell
+cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai
+.\backend\.venv\Scripts\python.exe backend\tests\automated_browser_qa.py
+```
+*Current Result*: **29 passed, 0 failed (100%)** across 7 phases:
+* Real DOM mount, title, and badge verification.
+* Mathematical validation of 5 KPI cards against live API payload.
+* Zero browser console errors and zero uncaught exceptions.
+* In-place `↻ Refresh` button state update without page reload.
+* Backend outage simulation, `Backend: Offline` transition, and explicit `STALE CACHED DATA` warning.
+* Backend recovery and instant reconnection.
+* Multi-viewport responsive checks (Desktop 1440×900, Tablet 768×1024, Mobile 390×844) with zero overflow.
+
+**Preserved QA Evidence:**
+* Comprehensive Report: [`docs/day1_automated_browser_qa_report.md`](docs/day1_automated_browser_qa_report.md)
+* Machine-Readable Results: [`docs/screenshots/qa_results.json`](docs/screenshots/qa_results.json)
+* Desktop Viewport Capture: [`docs/screenshots/desktop_1440x900.png`](docs/screenshots/desktop_1440x900.png)
+* Tablet Viewport Capture: [`docs/screenshots/tablet_768x1024.png`](docs/screenshots/tablet_768x1024.png)
+* Mobile Viewport Capture: [`docs/screenshots/mobile_390x844.png`](docs/screenshots/mobile_390x844.png)
+* Backend Outage & Stale State: [`docs/screenshots/offline_stale_state.png`](docs/screenshots/offline_stale_state.png)
 
 ---
 

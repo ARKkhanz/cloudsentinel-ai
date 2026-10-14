@@ -86,6 +86,10 @@ The dashboard handles 5 discrete application states:
 4. **Error State (First Load)**: `error !== null` with no previous data. Displays red alert banner with error message and a "Retry Connection" button.
 5. **Stale Data State (Backend Lost After Fetch)**: If the backend goes down after initial retrieval, old samples are **not** falsely presented as current. Instead, `isStale` is set to `true`, a prominent warning alert is displayed, and the table and cards are explicitly badged as `[STALE CACHED DATA]`.
 
+### 4.1 React State Hooks (`useState` & `useEffect`)
+* **`useState`**: Manages reactive component state (`health`, `metricsData`, `isLoading`, `error`, `isStale`, `lastFetched`). When an asynchronous fetch completes and state setter functions (`setHealth`, `setMetricsData`) are invoked, React automatically triggers re-rendering of the DOM to paint updated KPI cards and observation rows.
+* **`useEffect`**: Handles side effects outside pure rendering. On initial component mount (`[]` dependency array), it dispatches the initial asynchronous `loadData()` call to populate the dashboard without blocking first paint.
+
 ---
 
 ## 5. Why Deterministic Synthetic Telemetry Matters
@@ -96,8 +100,8 @@ The dashboard handles 5 discrete application states:
 ---
 
 ## 6. Why Both Pydantic and TypeScript Matter
-* **Pydantic (Backend)**: Validates incoming and outgoing data at runtime. It guarantees that unexpected client payloads or corrupt database rows are caught and rejected with HTTP 422.
-* **TypeScript (Frontend)**: Validates code structure at compile time. It guarantees that our React components only access properties that actually exist on the backend schemas, eliminating `"Cannot read property of undefined"` runtime crashes in the browser.
+* **Pydantic (Backend)**: Validates incoming request queries and outgoing response payloads at runtime. It guarantees that malformed client parameters or corrupt data rows are caught and rejected immediately with `HTTP 422 Unprocessable Entity`.
+* **TypeScript (Frontend)**: Validates code structure and type consistency at compile time. It ensures developers cannot accidentally access non-existent properties on API models during coding and bundling. **Critical Caveat**: Because TypeScript types are completely erased during JavaScript compilation, TypeScript **does not validate external JSON at runtime**. If a server returns missing or malformed fields, TypeScript cannot intercept it—which is why backend runtime schema validation (Pydantic), try/catch error boundaries, and defensive fallback defaults (`avgLatency || '--'`) are required.
 
 ---
 
@@ -112,6 +116,12 @@ The dashboard handles 5 discrete application states:
 3. **Transient GitHub HTTPS Connection Timeout**:
    * *Symptom*: `git push` timed out after 21s due to a momentary network drop to `github.com:443`.
    * *Fix*: Re-verified credential configuration with `gh auth setup-git` and retried immediately, successfully publishing commit `7ac1916`.
+4. **CSS `text-transform: uppercase` in Browser InnerText Assertions**:
+   * *Symptom*: Automated Chrome DevTools Protocol tests checking case-sensitive `innerText` strings failed because CSS styled badges in uppercase.
+   * *Fix*: Evaluated badge text case-insensitively (`.lower()`) to verify semantic content regardless of CSS presentation rules.
+5. **PowerShell `Stop-Process` Targeting Port 8000 Sockets**:
+   * *Symptom*: `Get-NetTCPConnection -LocalPort 8000` returned PID `0` for `TimeWait` sockets, causing `Stop-Process` to error out on system process `0` before killing the Uvicorn PID.
+   * *Fix*: Filtered connection states to `-State Listen` and `OwningProcess -gt 0` to target only the active server PID.
 
 ---
 
