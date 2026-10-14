@@ -98,21 +98,18 @@ cloudsentinel-ai/
 Open a PowerShell terminal in the repository root:
 
 ```powershell
-# Navigate to backend directory
-cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai\backend
+# Ensure you are at the repository root
+cd C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai
 
-# Create Python virtual environment
-python -m venv .venv
-
-# Activate virtual environment (PowerShell)
-.\.venv\Scripts\Activate.ps1
+# Create Python virtual environment (if not already created)
+python -m venv backend/.venv
 
 # Install backend dependencies
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+.\backend\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\backend\.venv\Scripts\pip.exe install -r backend/requirements.txt
 
-# Start the FastAPI backend server
-python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
+# Start the FastAPI backend server from the repository root
+.\backend\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 The FastAPI backend will start at `http://127.0.0.1:8000`. You can view the automatic OpenAPI documentation at `http://127.0.0.1:8000/docs`.
 
