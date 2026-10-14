@@ -1,4 +1,12 @@
 import { HealthResponse, MetricListResponse } from '../types/metrics';
+import {
+  DemoGenerateRequest,
+  DemoGenerateResponse,
+  DetectionRunRequest,
+  DetectionRunResponse,
+  IncidentListResponse,
+  IncidentResponse,
+} from '../types/incidents';
 
 // Resolves backend API base URL from Vite environment with local fallback
 const API_BASE_URL =
@@ -87,5 +95,151 @@ export async function fetchMetrics(
     throw new Error(
       `Network error connecting to metrics API at ${url}. Ensure the FastAPI server is running.`
     );
+  }
+}
+
+/**
+ * Trigger synthetic demo telemetry generation.
+ * Target: POST /api/demo/generate
+ */
+export async function generateDemoData(
+  request: DemoGenerateRequest = {}
+): Promise<DemoGenerateResponse> {
+  const url = `${API_BASE_URL}/api/demo/generate`;
+  const body = {
+    service: request.service || 'demo-api',
+    total_samples: request.total_samples ?? 100,
+    seed: request.seed ?? 42,
+    latency_spike_count: request.latency_spike_count ?? 3,
+    error_spike_count: request.error_spike_count ?? 2,
+    replace_existing: request.replace_existing ?? true,
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new ApiError(`Demo generation failed with HTTP ${response.status}: ${errorText}`, response.status);
+    }
+
+    return (await response.json()) as DemoGenerateResponse;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new Error(`Network error calling demo generate at ${url}: ${(error as Error).message}`);
+  }
+}
+
+/**
+ * Trigger an anomaly detection run.
+ * Target: POST /api/detection/run
+ */
+export async function runDetection(
+  request: DetectionRunRequest
+): Promise<DetectionRunResponse> {
+  const url = `${API_BASE_URL}/api/detection/run`;
+  const body = {
+    service: request.service || 'demo-api',
+    detector: request.detector,
+    limit: request.limit ?? 100,
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new ApiError(`Detection run failed with HTTP ${response.status}: ${errorText}`, response.status);
+    }
+
+    return (await response.json()) as DetectionRunResponse;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new Error(`Network error calling detection run at ${url}: ${(error as Error).message}`);
+  }
+}
+
+/**
+ * Fetch persisted incidents.
+ * Target: GET /api/incidents?service={service}&status={status}&detector_name={detector_name}&limit={limit}
+ */
+export async function fetchIncidents(
+  service: string = 'demo-api',
+  limit: number = 50,
+  status?: string,
+  detector_name?: string
+): Promise<IncidentListResponse> {
+  const queryParams = new URLSearchParams();
+  if (service) queryParams.set('service', service);
+  queryParams.set('limit', limit.toString());
+  if (status) queryParams.set('status', status);
+  if (detector_name) queryParams.set('detector_name', detector_name);
+
+  const url = `${API_BASE_URL}/api/incidents?${queryParams.toString()}`;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new ApiError(`Incidents request failed with HTTP ${response.status}: ${errorText}`, response.status);
+    }
+
+    return (await response.json()) as IncidentListResponse;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new Error(`Network error connecting to incidents API at ${url}: ${(error as Error).message}`);
+  }
+}
+
+/**
+ * Fetch complete evidence detail for a single incident by UUID.
+ * Target: GET /api/incidents/{id}
+ */
+export async function fetchIncidentById(id: string): Promise<IncidentResponse> {
+  const url = `${API_BASE_URL}/api/incidents/${encodeURIComponent(id)}`;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new ApiError(`Incident lookup failed with HTTP ${response.status}: ${errorText}`, response.status);
+    }
+
+    return (await response.json()) as IncidentResponse;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new Error(`Network error fetching incident at ${url}: ${(error as Error).message}`);
   }
 }

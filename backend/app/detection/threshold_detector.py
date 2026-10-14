@@ -1,9 +1,25 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import math
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 
 from backend.app.schemas.metrics import MetricSample
+
+
+def _normalize_utc_timestamp(ts: Any) -> datetime:
+    """Normalize input timestamp to timezone-aware UTC datetime. Rejects missing or non-datetime values."""
+    if ts is None:
+        raise ValueError("Missing required observation timestamp for detection finding")
+    if isinstance(ts, str):
+        try:
+            ts = datetime.fromisoformat(ts)
+        except Exception as exc:
+            raise ValueError(f"Invalid timestamp format: {ts}") from exc
+    if not isinstance(ts, datetime):
+        raise TypeError(f"Timestamp must be a datetime or ISO string, got {type(ts).__name__}")
+    if ts.tzinfo is None:
+        return ts.replace(tzinfo=timezone.utc)
+    return ts.astimezone(timezone.utc)
 
 
 class ThresholdFinding(BaseModel):
@@ -218,9 +234,11 @@ class ThresholdDetector:
             "error_rate": self.error_rate_threshold,
         }
 
+        obs_timestamp = _normalize_utc_timestamp(fields.get("timestamp"))
+
         return ThresholdFinding(
             service=fields["service"],
-            timestamp=fields["timestamp"],
+            timestamp=obs_timestamp,
             metric_id=fields["id"],
             detector_name=self.name,
             detector_version=self.version,

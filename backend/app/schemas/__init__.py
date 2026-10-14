@@ -12,6 +12,12 @@ from backend.app.schemas.demo import (
     GroundTruthAnomaly,
     DemoGenerateResponse,
 )
+from backend.app.schemas.incidents import (
+    DetectionRunRequest,
+    DetectionRunResponse,
+    IncidentResponse,
+    IncidentListResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -22,4 +28,8 @@ __all__ = [
     "DemoGenerateRequest",
     "GroundTruthAnomaly",
     "DemoGenerateResponse",
+    "DetectionRunRequest",
+    "DetectionRunResponse",
+    "IncidentResponse",
+    "IncidentListResponse",
 ]

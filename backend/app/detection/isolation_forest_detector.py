@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import math
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
@@ -15,6 +15,22 @@ FEATURE_NAMES: Tuple[str, ...] = (
     "memory_usage_pct",
     "request_count",
 )
+
+
+def _normalize_utc_timestamp(ts: Any) -> datetime:
+    """Normalize input timestamp to timezone-aware UTC datetime. Rejects missing or non-datetime values."""
+    if ts is None:
+        raise ValueError("Missing required observation timestamp for detection finding")
+    if isinstance(ts, str):
+        try:
+            ts = datetime.fromisoformat(ts)
+        except Exception as exc:
+            raise ValueError(f"Invalid timestamp format: {ts}") from exc
+    if not isinstance(ts, datetime):
+        raise TypeError(f"Timestamp must be a datetime or ISO string, got {type(ts).__name__}")
+    if ts.tzinfo is None:
+        return ts.replace(tzinfo=timezone.utc)
+    return ts.astimezone(timezone.utc)
 
 
 class MLDetectionFinding(BaseModel):
@@ -255,9 +271,11 @@ class IsolationForestDetector:
             f"score was {score:.4f} (negative decision score indicates isolation in anomalous subspace)."
         )
 
+        obs_timestamp = _normalize_utc_timestamp(meta.get("timestamp"))
+
         return MLDetectionFinding(
             service=meta["service"],
-            timestamp=meta["timestamp"] or datetime.now(),
+            timestamp=obs_timestamp,
             metric_id=meta["id"],
             detector_name=self.name,
             detector_version=self.version,
@@ -299,6 +317,7 @@ class IsolationForestDetector:
         findings: List[MLDetectionFinding] = []
         for i, (pred, score, meta) in enumerate(zip(preds, scores, metas)):
             if pred == -1:
+                obs_timestamp = _normalize_utc_timestamp(meta.get("timestamp"))
                 severity = "critical" if score < -0.15 else "warning"
                 summary = (
                     f"Multivariate Anomaly Detected by IsolationForest on {meta['service']} "
@@ -319,7 +338,7 @@ class IsolationForestDetector:
                 findings.append(
                     MLDetectionFinding(
                         service=meta["service"],
-                        timestamp=meta["timestamp"] or datetime.now(),
+                        timestamp=obs_timestamp,
                         metric_id=meta["id"],
                         detector_name=self.name,
                         detector_version=self.version,

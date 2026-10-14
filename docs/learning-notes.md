@@ -1,156 +1,177 @@
-# CloudSentinel AI — Day 1 Learning & Technical Notes
+# CloudSentinel AI — Engineering & Learning Architecture Guide
+
+This document explains the technical architecture, data pipeline, design decisions, and reliability principles implemented in CloudSentinel AI across Day 1 and Day 2 (Milestones 1–5).
 
 ---
 
-## 1. What We Built on Day 1
-On Day 1, we established a working, explainable end-to-end vertical slice connecting a real **React + TypeScript + Vite** frontend to a real **Python + FastAPI + Pydantic** backend service.
+## 1. End-to-End Architecture: Detection-to-Incident Pipeline
 
-Instead of building superficial mock UI components or hardcoding data, the frontend communicates with the backend over live HTTP requests. The backend returns deterministically generated synthetic service telemetry samples, strictly validated against Pydantic schema contracts.
-
----
-
-## 2. File Responsibilities & Architecture
-
-### Backend (`backend/`)
-* [`backend/app/main.py`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/backend/app/main.py): Application entry point. Instantiates FastAPI, attaches `CORSMiddleware`, and registers the health and metrics route modules.
-* [`backend/app/config.py`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/backend/app/config.py): Configuration management. Holds host, port, debug mode, and permitted CORS origins.
-* [`backend/app/schemas/metrics.py`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/backend/app/schemas/metrics.py): Pydantic models enforcing data contracts for `HealthResponse`, `MetricSample`, and `MetricListResponse`.
-* [`backend/app/services/metric_generator.py`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/backend/app/services/metric_generator.py): Pure business logic. Generates realistic, reproducible synthetic telemetry using an isolated `random.Random(seed=42)` instance and fixed reference timestamp `2026-10-14T12:00:00Z`.
-* [`backend/app/api/routes_health.py`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/backend/app/api/routes_health.py): `GET /health` route returning service readiness status.
-* [`backend/app/api/routes_metrics.py`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/backend/app/api/routes_metrics.py): `GET /api/metrics` route validating query parameters (`limit: 1..200`) and returning telemetry lists.
-* [`backend/tests/conftest.py`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/backend/tests/conftest.py): Reusable session-scoped `TestClient` fixture for in-memory ASGI testing.
-* [`backend/tests/test_health.py`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/backend/tests/test_health.py): Automated unit/integration tests for `/health`.
-* [`backend/tests/test_metrics.py`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/backend/tests/test_metrics.py): Automated unit/integration tests for schema validity, limit bounds, determinism, timestamps, and synthetic flags.
-* [`backend/tests/verify_milestone4_integration.py`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/backend/tests/verify_milestone4_integration.py): Process lifecycle script that verifies live Uvicorn socket binding, CORS headers, error detection, and restart recovery over network HTTP calls.
-
-### Frontend (`frontend/`)
-* [`frontend/src/api/client.ts`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/frontend/src/api/client.ts): Centralized HTTP client wrapping `fetch()`. Exposes typed `fetchHealth()` and `fetchMetrics()` functions and formats clean error messages.
-* [`frontend/src/types/metrics.ts`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/frontend/src/types/metrics.ts): TypeScript type interfaces mirroring backend Pydantic models.
-* [`frontend/src/App.tsx`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/frontend/src/App.tsx): Main dashboard view. Orchestrates state (`health`, `metricsData`, `isLoading`, `error`, `isStale`), aggregates KPI summaries, and renders the observation table.
-* [`frontend/src/index.css`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/frontend/src/index.css): Design system with dark-mode styling, accessible contrast, pulsing indicators, and responsive mobile breakpoints.
-
----
-
-## 3. End-to-End Request Flow (Browser to Backend)
+CloudSentinel AI establishes an evidence-backed incident workflow:
 
 ```
-[User Browser]
-   │
-   ▼
-1. React Component (`App.tsx`)
-   Calls `loadData()` inside `useEffect` on mount or upon clicking "Refresh".
-   │
-   ▼
-2. API Client (`api/client.ts`)
-   Constructs URL: `http://localhost:8000/api/metrics?service=demo-api&limit=50`.
-   Dispatches asynchronous HTTP GET via native `fetch()`.
-   │
-   ▼
-3. Web Server & ASGI Layer (`uvicorn` + `FastAPI`)
-   Receives HTTP request on port 8000.
-   `CORSMiddleware` inspects `Origin: http://localhost:5173` against `settings.allowed_origins`.
-   │
-   ▼
-4. Route Handler & Input Validation (`routes_metrics.py`)
-   FastAPI Query validator checks `1 <= limit <= 200`.
-   (If invalid, returns HTTP 422 JSON before running logic).
-   │
-   ▼
-5. Metric Generator Service (`metric_generator.py`)
-   Runs pure deterministic generator with fixed seed `42` and fixed reference timestamp.
-   Computes normal baseline values with Gaussian jitter.
-   │
-   ▼
-6. Schema Validation & Serialization (`schemas/metrics.py`)
-   Pydantic validates each `MetricSample` and wraps them in `MetricListResponse`.
-   FastAPI serializes models into JSON string and sets HTTP headers.
-   │
-   ▼
-7. Response Delivery (HTTP 200 OK)
-   Browser receives JSON payload across TCP socket.
-   │
-   ▼
-8. React State Update & Re-render (`App.tsx`)
-   `setMetricsData(payload)` and `setIsLoading(false)` are called.
-   React compares virtual DOM and paints updated metric cards and 50 table rows.
+[Synthetic / Ingested Telemetry]
+              │
+              ▼
+   [SQLite Database Engine]
+       (Table: metric_samples)
+              │
+              ▼
+   [Incident Service Layer]  <── Queries persisted samples (newest first, reversed to chronological)
+              │
+              ├───► [Selected Detector: ThresholdDetector]
+              │         Evaluates against statistical boundaries (>150ms latency, >5% error rate)
+              │         Yields: ThresholdFinding
+              │
+              └───► [Selected Detector: IsolationForestDetector]
+                        Fits on clean reference baseline (Seed 100, 100 samples, 0 anomalies)
+                        Scores multivariate feature subspace (latency, error_rate, cpu, memory, requests)
+                        Yields: MLDetectionFinding
+              │
+              ▼
+    [Incident Conversion & Deduplication Engine]
+        Computes deterministic key: f"{service}:{detector_name}:{obs_timestamp_utc_iso}"
+        Filters previously recorded findings to prevent duplicate alert noise
+              │
+              ▼
+   [SQLite Database Engine]
+       (Table: incidents)  <── Stores immutable evidence snapshots & detector metadata
+              │
+              ▼
+   [FastAPI Endpoints]
+       POST /api/detection/run
+       GET  /api/incidents
+       GET  /api/incidents/{id}
+              │
+              ▼
+   [React Dashboard UI]
+       Action Controls -> Metrics Overview -> Incidents Table -> Evidence Modal
 ```
 
 ---
 
-## 4. UI State Lifecycle Machine
+## 2. Core Concepts & Design Decisions
 
-The dashboard handles 5 discrete application states:
-1. **Loading State**: `isLoading === true`. Displays a CSS spinner in the button, pulses the health badge, and displays a loading message in the table.
-2. **Success / Populated State**: `health !== null` and `metrics.length > 0`. Renders green online badge, 5 calculated KPI cards, and 50 formatted observation rows.
-3. **Empty State**: `!isLoading && !error && metrics.length === 0`. Renders a dedicated empty state box informing the user that no samples match the query.
-4. **Error State (First Load)**: `error !== null` with no previous data. Displays red alert banner with error message and a "Retry Connection" button.
-5. **Stale Data State (Backend Lost After Fetch)**: If the backend goes down after initial retrieval, old samples are **not** falsely presented as current. Instead, `isStale` is set to `true`, a prominent warning alert is displayed, and the table and cards are explicitly badged as `[STALE CACHED DATA]`.
+### 2.1 What an Incident Represents
+An incident in CloudSentinel AI represents a **persisted, factual anomaly finding** produced by an active detector against recorded telemetry observations. It is an alert record indicating that observed system behavior deviated significantly from expected operational boundaries.
 
-### 4.1 React State Hooks (`useState` & `useEffect`)
-* **`useState`**: Manages reactive component state (`health`, `metricsData`, `isLoading`, `error`, `isStale`, `lastFetched`). When an asynchronous fetch completes and state setter functions (`setHealth`, `setMetricsData`) are invoked, React automatically triggers re-rendering of the DOM to paint updated KPI cards and observation rows.
-* **`useEffect`**: Handles side effects outside pure rendering. On initial component mount (`[]` dependency array), it dispatches the initial asynchronous `loadData()` call to populate the dashboard without blocking first paint.
+An incident is NOT:
+* A speculative claim about software bugs or infrastructure failure.
+* An unverified or fabricated alert.
+* A temporary alert dismissed when browser is refreshed.
 
----
-
-## 5. Why Deterministic Synthetic Telemetry Matters
-* **Zero Flakiness**: Tests can assert exact equality (`assert res_1.json() == res_2.json()`) without fearing random differences.
-* **Repeatable Demos**: Anyone who clones the repository gets the exact same values without setting up complex database seeders or waiting for live metric scrapers.
-* **Controlled Evaluation (Days 2 & 3)**: When we inject anomalies on Day 2, we have precise ground truth for anomaly locations, allowing honest evaluation of precision and recall.
-
----
-
-## 6. Why Both Pydantic and TypeScript Matter
-* **Pydantic (Backend)**: Validates incoming request queries and outgoing response payloads at runtime. It guarantees that malformed client parameters or corrupt data rows are caught and rejected immediately with `HTTP 422 Unprocessable Entity`.
-* **TypeScript (Frontend)**: Validates code structure and type consistency at compile time. It ensures developers cannot accidentally access non-existent properties on API models during coding and bundling. **Critical Caveat**: Because TypeScript types are completely erased during JavaScript compilation, TypeScript **does not validate external JSON at runtime**. If a server returns missing or malformed fields, TypeScript cannot intercept it—which is why backend runtime schema validation (Pydantic), try/catch error boundaries, and defensive fallback defaults (`avgLatency || '--'`) are required.
+Every incident contains:
+1. Unique incident UUID.
+2. Target service identifier.
+3. UTC creation timestamp.
+4. Severity level (`critical` or `warning`).
+5. Status (initially `open`).
+6. Detector attribution (`detector_name` and `detector_version`).
+7. Factual human-readable summary headline.
+8. Non-speculative explanation.
+9. Observed numerical measurements at time of observation.
+10. Baseline/detector evidence snapshot (threshold rules or ML decision score and parameters).
+11. Applicable observation timestamp window.
+12. Deterministic deduplication key.
 
 ---
 
-## 7. Day 1 Bugs Encountered & How They Were Resolved
+### 2.2 What Detector Evidence Means
+Detector evidence is the **verifiable numerical data** that justified flagging an observation as anomalous:
+* **For Threshold Breaches**: Exact measured values vs configured thresholds, numerical excess (e.g., `+271.57 ms`), units (`ms` or `%`), and the breached condition (`observed > threshold`).
+* **For IsolationForest Outliers**: Raw Scikit-Learn `decision_function` score (e.g. `-0.0011`, where negative values indicate subspace isolation), binary prediction label (`-1`), expected contamination (`0.05`), tree count (`100`), reference baseline size (`100 normal samples`), and evaluated feature names.
 
-1. **Windows Console UnicodeEncodeError (`\u2713`)**:
-   * *Symptom*: Python threw `UnicodeEncodeError: 'charmap' codec can't encode character '\u2713'` when printing checkmark characters in PowerShell under default CP1252 encoding.
-   * *Fix*: Replaced raw unicode symbols with portable ASCII tags (`[PASS]`).
-2. **Vite TypeScript Environment Missing Property (`import.meta.env`)**:
-   * *Symptom*: `npm run build` failed with `Property 'env' does not exist on type 'ImportMeta'`.
-   * *Fix*: Added [`frontend/src/vite-env.d.ts`](file:///C:/Users/USER/.gemini/antigravity-ide/scratch/cloudsentinel-ai/frontend/src/vite-env.d.ts) referencing `/// <reference types="vite/client" />`.
-3. **Transient GitHub HTTPS Connection Timeout**:
-   * *Symptom*: `git push` timed out after 21s due to a momentary network drop to `github.com:443`.
-   * *Fix*: Re-verified credential configuration with `gh auth setup-git` and retried immediately, successfully publishing commit `7ac1916`.
-4. **CSS `text-transform: uppercase` in Browser InnerText Assertions**:
-   * *Symptom*: Automated Chrome DevTools Protocol tests checking case-sensitive `innerText` strings failed because CSS styled badges in uppercase.
-   * *Fix*: Evaluated badge text case-insensitively (`.lower()`) to verify semantic content regardless of CSS presentation rules.
-5. **PowerShell `Stop-Process` Targeting Port 8000 Sockets**:
-   * *Symptom*: `Get-NetTCPConnection -LocalPort 8000` returned PID `0` for `TimeWait` sockets, causing `Stop-Process` to error out on system process `0` before killing the Uvicorn PID.
-   * *Fix*: Filtered connection states to `-State Listen` and `OwningProcess -gt 0` to target only the active server PID.
+Evidence must always be factual, grounded strictly in numbers, and distinct from any inferred interpretation.
 
 ---
 
-## 8. Git Commit Log for Day 1
+### 2.3 How Threshold Incidents Differ from ML Incidents
 
-| Commit | Message | Key Deliverables |
+| Dimension | Threshold Incidents (`ThresholdDetector`) | ML Incidents (`IsolationForestDetector`) |
 | :--- | :--- | :--- |
-| `2a8b78e` | `chore: initialize app structure` | Repository initialization, `.gitignore`, `.env.example`, initial `README.md` |
-| `99edf1c` | `feat(api): add health and synthetic metrics endpoints` | FastAPI app, Pydantic schemas, deterministic generator, routes `/health` & `/api/metrics` |
-| `7ac1916` | `test(api): add health and synthetic metrics tests` | Pytest suite (17 tests), `conftest.py`, live Uvicorn socket verification script |
-| `ec277e5` | `feat(ui): initialize react typescript dashboard` | React + TypeScript + Vite skeleton, types, centralized API client, styling |
-| `59acbe1` | `feat(ui): connect dashboard to live metrics API` | Connected React dashboard, state lifecycle, KPI cards, table, live integration test |
+| **Logic** | Univariate rule boundaries evaluated independently | Multivariate subspace partitioning across 5 combined metrics |
+| **Boundaries** | Explicit fixed thresholds (`latency > 150ms`, `error_rate > 5%`) | Dynamic learned density cluster isolation |
+| **Evidence** | Direct excess comparisons (`observed - threshold`) | Mathematical decision score (shorter tree path length) |
+| **Severity Mapping** | Deterministic based on breached metric (latency -> warning, error rate / both -> critical) | Deterministic based on outlier extremity (score < -0.15 -> critical, else warning) |
+| **Interpretability** | Immediate: obvious why breach occurred | Geometric: observation isolated in multi-metric space |
 
 ---
 
-## 9. Important Prototype Limitations
+### 2.4 Why Deduplication Matters
+In reliability engineering, duplicate alerts cause **alert fatigue**, burying critical outages under thousands of repeated notifications.
 
-* Telemetry is currently in-memory and re-generated per request (database persistence arrives on Day 2).
-* Telemetry currently models healthy baseline operations; anomaly injection and detection algorithms arrive on Day 2.
-* No authentication or automated background remediation is included.
+Running the same detector repeatedly on the same persisted metric records must never create duplicate incidents.
+
+**CloudSentinel Deduplication Strategy**:
+* Identity Key: `dedup_key = f"{service}:{detector_name}:{obs_timestamp_utc_iso}"`.
+* **Cross-Detector Independence**: Because `detector_name` is embedded in the key, running `threshold_baseline` and `isolation_forest` on the exact same sample generates distinct deduplication keys (`demo-api:threshold_baseline:...` vs `demo-api:isolation_forest:...`). Neither detector suppresses the other!
+* **Idempotency**: Repeatedly executing the same detector on the same samples increments `incidents_already_existing` and returns 0 new incidents, keeping the database clean.
+* **Database Constraint**: A unique index on `incidents.dedup_key` guarantees database-level race protection.
 
 ---
 
-## 10. Comprehension Questions for You
+### 2.5 Why Evidence Snapshots Must Survive Telemetry Regeneration
+In prototype and testing environments, synthetic telemetry datasets are frequently regenerated or wiped (e.g. `replace_existing=True` in `/api/demo/generate`).
 
-Please review these questions to verify your technical mastery of the Day 1 codebase:
+If an incident only contained foreign keys or pointers to raw metric rows, regenerating the dataset would leave orphaned incidents or corrupt investigation records.
 
-1. **In `metric_generator.py`, why did we use `random.Random(seed)` instead of the global `random.seed(seed)`?**
-2. **If an external client calls `GET /api/metrics?limit=300`, what layer of our architecture rejects the request, what HTTP status is returned, and why does Python execution never reach `generate_synthetic_metrics()`?**
-3. **What is the exact purpose of `Access-Control-Allow-Origin: http://localhost:5173` in FastAPI's response headers, and what would happen in Google Chrome if this header was missing?**
-4. **How does our frontend distinguish between an initial loading state and a stale data state when the backend disconnects?**
-5. **Why do we maintain separate type definitions in `schemas/metrics.py` (Python) and `types/metrics.ts` (TypeScript) instead of sharing a single file?**
+CloudSentinel AI solves this by embedding an **immutable evidence snapshot** directly within the `IncidentModel` record in SQLite (`observed_metric_evidence` and `baseline_evidence`). Even if the originating telemetry samples are deleted or replaced, the incident's investigation evidence remains 100% complete, legible, and verifiable.
+
+---
+
+### 2.6 How FastAPI Exposes Incident Records
+FastAPI exposes incidents through clean REST endpoints decoupled from database internals:
+* `POST /api/detection/run`: Accepts `{ service, detector, limit }`. Executes the pipeline via `incident_service.py` and returns structured summary counts.
+* `GET /api/incidents`: Supports filtering by `service`, `status`, `detector_name`, and bounded `limit`. Orders records newest-first (`created_at.desc()`).
+* `GET /api/incidents/{id}`: Looks up a specific incident by UUID. Returns HTTP 404 with standard JSON detail if not found.
+
+Pydantic schemas (`DetectionRunRequest`, `DetectionRunResponse`, `IncidentResponse`, `IncidentListResponse`) enforce request validation and response serialization.
+
+---
+
+### 2.7 How React Fetches and Displays Incidents
+The React dashboard (`App.tsx`) uses a centralized API client (`client.ts`) without external state libraries:
+* **Concurrent Loading**: Dispatches `fetchHealth()`, `fetchMetrics()`, and `fetchIncidents()` in parallel via `Promise.all`.
+* **Action Controls Toolbar**:
+  * `⚡ Generate Synthetic Data`: Generates 100 samples with 5 injected anomalies.
+  * `📊 Run Threshold Detection`: Triggers rule-based detection and updates the incident list.
+  * `🌲 Run IsolationForest Detection`: Triggers ML detection and populates multivariate findings.
+* **Incident Table**: Renders incident UUID, observation time, severity badge, detector tag, status, summary, and a "View Evidence" button.
+* **Evidence Modal**: Displays complete evidence breakdown including observed measurements, comparison rules, IsolationForest decision score, and anti-speculation disclaimers.
+
+---
+
+### 2.8 Why Anomaly Detection Cannot Establish Root Cause
+Unsupervised anomaly detection algorithms (like IsolationForest) and threshold detectors detect **statistical abnormality**, not **causality**:
+* A detector knows *that* latency surged to 420ms or *that* a metric combination is isolated in feature space.
+* A detector does NOT know *why* it happened (e.g., whether caused by an unindexed SQL query, a memory leak, a third-party API outage, or GC pauses).
+
+Claiming that anomaly detection "diagnosed the root cause" is scientifically inaccurate. CloudSentinel AI enforces this principle in all summaries, explanations, and UI disclaimers.
+
+---
+
+### 2.9 How Data Survives a Server Restart
+CloudSentinel AI uses **SQLite** backed by a persistent file (`backend/data/cloudsentinel.db`) via SQLAlchemy ORM:
+* SQLite writes transactions to persistent disk storage using ACID write-ahead logging.
+* When the FastAPI backend (Uvicorn) is stopped, the database file remains intact on disk.
+* Upon server restart, SQLAlchemy reconnects to the database file, and `init_db()` synchronizes table schemas without dropping existing records.
+* This was verified in automated testing: all 10 persisted incidents remained available immediately following backend restart.
+
+---
+
+### 2.10 Timestamp Integrity & Separation
+Every incident maintains three distinct, unambiguous UTC timestamps:
+1. **Observation Timestamp (`window_start` / `window_end`)**: When the anomaly physically occurred in the monitored service.
+2. **Detection Run Timestamp (`run_timestamp`)**: When the detection algorithm executed.
+3. **Creation Timestamp (`created_at`)**: When the incident record was committed to SQLite.
+
+Detectors strictly reject missing timestamps (`timestamp=None`) and normalize all values to UTC timezone-aware datetimes, completely preventing silent fallbacks to `datetime.now()`.
+
+---
+
+## 3. Automated Verification Summary
+
+| Suite | Scope | Result | Execution Time |
+| :--- | :--- | :---: | :---: |
+| **Pytest Backend Suite** | 7 test files (Health, Metrics, Persistence, Demo Gen, Threshold, ML, Incidents) | **96 passed, 0 failed** | ~8.3s |
+| **Frontend Production Build** | TypeScript compiler check (`tsc -b`) & Vite bundler | **Pass** (0 errors) | ~1.1s |
+| **Real Chrome Browser QA** | 11 automated CDP steps (Connection, Generation, Threshold, ML, Evidence, Dedup, Persistence, Mobile) | **11 passed, 0 failed** | ~23s |

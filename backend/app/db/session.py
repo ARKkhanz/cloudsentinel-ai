@@ -1,6 +1,6 @@
 import os
 from typing import Generator
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, Session
 
 from backend.app.config import settings
@@ -42,6 +42,20 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db(target_engine=None) -> None:
-    """Initialize all database tables registered on Base metadata."""
+    """Initialize all database tables registered on Base metadata and ensure column synchronization."""
     eng = target_engine or engine
     Base.metadata.create_all(bind=eng)
+
+    try:
+        with eng.connect() as conn:
+            inspector = inspect(conn)
+            if "incidents" in inspector.get_table_names():
+                cols = {c["name"] for c in inspector.get_columns("incidents")}
+                if "metric_sample_id" not in cols:
+                    conn.execute(text("ALTER TABLE incidents ADD COLUMN metric_sample_id INTEGER"))
+                if "dedup_key" not in cols:
+                    conn.execute(text("ALTER TABLE incidents ADD COLUMN dedup_key VARCHAR(160)"))
+                    conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_incidents_dedup_key ON incidents (dedup_key)"))
+                conn.commit()
+    except Exception:
+        pass
