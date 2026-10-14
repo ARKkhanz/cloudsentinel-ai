@@ -29,7 +29,8 @@ Developed as a four-day engineering project following the *CloudSentinel AI Impl
   - [x] **Milestone 2**: Secure backend and frontend Dockerfiles + production Nginx configuration
   - [x] **Milestone 3**: Docker Compose multi-container orchestration, networking, and SQLite volume persistence
   - [x] **Milestone 4**: GitHub Actions CI workflow + real Docker multi-container integration and SQLite persistence verification
-- **Day 4: End-to-End Verification, Documentation & Demo** *(Planned)*
+  - [x] **Milestone 5**: Final Day 3 quality gate, CI hardening (`ubuntu-24.04` & Node 24 runtime), volume safety, and engineering audit
+- **Day 4: Final Verification, Presentation & Portfolio Delivery** *(Planned)*
 
 ---
 
@@ -310,6 +311,11 @@ docker compose ps
 docker compose down
 ```
 
+> [!WARNING]
+> **Data Safety Distinction (`docker compose down` vs. `-v`)**:
+> - **Routine Local Shutdown**: Developers and operators MUST run `docker compose down` (without `-v`). This gracefully tears down container namespaces and bridge networking while preserving the named SQLite volume (`cloudsentinel-data`), keeping all ingested metrics and recorded incident evidence intact across reboots.
+> - **CI Disposable Teardown**: In automated GitHub Actions CI pipelines, `docker compose down -v` is explicitly executed after tests complete. This is safe ONLY because CI runners are ephemeral, disposable sandbox virtual machines where temporary test volumes must be cleaned up to prevent runner disk leakage. **Never run `docker compose down -v` on a production or long-lived local development environment unless you intentionally wish to permanently destroy all database records.**
+
 > [!NOTE]
 > Detailed container architecture, volume lifecycle, and verification matrices are documented in [`docs/milestone-3-orchestration.md`](docs/milestone-3-orchestration.md).
 
@@ -317,21 +323,23 @@ docker compose down
 
 ## Continuous Integration (GitHub Actions)
 
-CloudSentinel AI runs an automated, multi-job continuous integration pipeline on GitHub-hosted `ubuntu-latest` runners:
+CloudSentinel AI runs an automated, multi-job continuous integration pipeline pinned to stable LTS GitHub-hosted `ubuntu-24.04` runners using official Node 24 actions:
 
 * **Workflow**: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
-* **Latest Verified Run**: [Run #38592619843 (100% Green)](https://github.com/ARKkhanz/cloudsentinel-ai/actions/runs/38592619843)
+* **Runner Environment**: `ubuntu-24.04` (pinned LTS release for deterministic toolchain reproducibility)
+* **Action Runtimes**: Official GitHub Actions (`actions/checkout@v7`, `actions/setup-python@v7`, `actions/setup-node@v7`) running natively on Node 24.
+* **Verified CI Workflow Run**: [Run #38593311494 (100% Green)](https://github.com/ARKkhanz/cloudsentinel-ai/actions/runs/38593311494)
 
 ### Automated Pipeline Jobs
 
-1. **`backend-tests`** (Ubuntu, Python 3.11):
+1. **`backend-tests`** (Ubuntu 24.04, Python 3.11):
    - Executes full 114-test regression suite (`pytest -v`).
    - Executes standalone detector evaluation benchmark (`evaluate_detectors.py`).
-2. **`frontend-checks`** (Ubuntu, Node.js 24):
+2. **`frontend-checks`** (Ubuntu 24.04, Node.js 24):
    - Runs clean install (`npm ci`) with dependency caching.
    - Executes ESLint linter (`npm run lint`, 0 warnings/errors).
    - Executes TypeScript compiler check and Vite production bundle (`npm run build`).
-3. **`docker-integration`** (Ubuntu, Real Docker Engine & Compose):
+3. **`docker-integration`** (Ubuntu 24.04, Real Docker Engine & Compose):
    - Validates Compose specification (`docker compose config --quiet`).
    - Builds container images (`docker compose build`).
    - Starts multi-container stack (`docker compose up -d`).
@@ -339,6 +347,7 @@ CloudSentinel AI runs an automated, multi-job continuous integration pipeline on
    - Tests telemetry generation, threshold detection, and IsolationForest anomaly detection.
    - Tests incident deduplication (0 duplicate incidents created on repeated run).
    - Tests SQLite named volume persistence across container recreation (`docker compose down` -> `docker compose up -d`).
+   - Safely tears down disposable containers and test volumes upon completion (`docker compose down -v`).
 
 ---
 

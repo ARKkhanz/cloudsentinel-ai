@@ -153,9 +153,16 @@ docker compose down
 | **Named Volume Specification** | Schema Assertions | **VERIFIED** | `cloudsentinel-data` mounted at `/app/backend/data` |
 | **Health Check Startup Tolerance** | Schema Assertions | **VERIFIED** | `start_period: 15s`, `retries: 5`, `interval: 10s`, `timeout: 5s` |
 | **Frontend Startup Dependency** | Schema Assertions | **VERIFIED** | `depends_on.backend.condition: service_healthy` |
-| **Backend Regression Suite** | Automated Pytest Run | **VERIFIED** | 114 passed, 0 failed in 13.46s |
+| **Backend Regression Suite** | Automated Pytest Run | **VERIFIED** | 114 passed, 0 failed in 12.24s |
 | **Frontend Linting** | Automated ESLint Run | **VERIFIED** | 0 errors, 0 warnings |
-| **Frontend Production Build** | Automated Vite Build | **VERIFIED** | Clean build in 1.08s |
+| **Frontend Production Build** | Automated Vite Build | **VERIFIED** | Clean build in 1.00s |
 | **Detector Evaluation Baseline** | Evaluation Benchmark | **VERIFIED** | Threshold F1=1.0000; IsolationForest F1=0.8000 |
-| **Local Docker Daemon Execution** | Host Environment | **UNVERIFIED AT RUNTIME** | Docker CLI and engine not installed on local host machine |
-| **Multi-Container Runtime Network** | Host Environment | **UNVERIFIED AT RUNTIME** | Scheduled for Day 3 Milestone 4 via GitHub Actions hosted runners |
+| **Local Docker Daemon Execution** | Host Environment | **NOT APPLICABLE** | Docker CLI and engine not installed on local host machine |
+| **Multi-Container Runtime Network** | Real Docker Engine (CI) | **VERIFIED** | Verified live on GitHub Actions runner (`ubuntu-24.04`) via `verify_docker_integration.py` |
+| **Direct & Proxied Health Endpoints** | Real Docker Engine (CI) | **VERIFIED** | Both direct (:8000) and Nginx reverse proxy (:3000) returned HTTP 200 with status `ok` |
+| **Frontend SPA Routing** | Real Docker Engine (CI) | **VERIFIED** | Nginx served compiled HTML without internal DNS leaks |
+| **Telemetry Generation & Persistence** | Real Docker Engine (CI) | **VERIFIED** | 100 samples generated and retrieved via `/api/metrics` |
+| **Threshold & ML Detection** | Real Docker Engine (CI) | **VERIFIED** | Both detectors produced factual findings and persisted incidents |
+| **Incident Deduplication** | Real Docker Engine (CI) | **VERIFIED** | Repeated detection produced exactly 0 duplicate incidents |
+| **SQLite Volume Persistence** | Real Docker Engine (CI) | **VERIFIED** | Telemetry and incidents survived container recreation (`compose down` -> `compose up -d`) |
+| **Data Safety Distinction** | Documentation Audit | **VERIFIED** | Safe local shutdown (`down`) vs ephemeral CI cleanup (`down -v`) clearly documented |

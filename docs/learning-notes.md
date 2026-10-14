@@ -271,3 +271,26 @@ In production, the browser only speaks to `http://localhost:3000`. It makes rela
 ### 4.8 Non-Root Permissions on Mounted Volumes
 In `backend/Dockerfile`, `/app/backend/data` is created and assigned to `cloudsentinel:appgroup`. When Docker initializes a named volume for a container, it copies the image directory's initial metadata and file permissions into the volume. This guarantees that SQLite transactions succeed without encountering read-only filesystem errors under `USER cloudsentinel`.
 
+### 4.9 CI Environment Hardening: Ubuntu 24.04 LTS Pinning & Node 24 Action Runtimes
+In Day 3 Milestone 5, the CI pipeline underwent engineering hardening to guarantee long-term reproducibility and eliminate runtime deprecation warnings:
+1. **Explicit Runner Pinning (`ubuntu-24.04`)**:
+   - Rather than relying on the moving target `ubuntu-latest` (which issued migration notices preparing for Ubuntu 26), all three workflow jobs explicitly pin `runs-on: ubuntu-24.04`.
+   - This fixes OS kernel, system C libraries, Docker engine, and toolchain versions to a stable Long-Term Support release, eliminating surprise pipeline breakage.
+2. **Official Node 24 Actions Upgrade (`v7`)**:
+   - Upgraded core actions to `actions/checkout@v7`, `actions/setup-python@v7`, and `actions/setup-node@v7`.
+   - These official major releases natively declare `using: 'node24'`, resolving the Node.js 20 deprecation notice.
+3. **Least-Privilege Security**:
+   - Preserved global `permissions: contents: read` to prevent workflow token privilege escalation.
+
+### 4.10 Safe Teardown Protocol: Ephemeral CI Cleanup vs. Local Volume Preservation
+A critical principle of containerized data safety is distinguishing disposable continuous integration environments from long-lived developer workstations:
+1. **Local Developer Workflow (`docker compose down`)**:
+   - Preserves named volume `cloudsentinel-data`.
+   - When developers stop their containers at the end of the day, all historical metric samples, generated demo scenarios, and recorded incident evidence remain safe on disk.
+2. **Automated CI Workflow (`docker compose down -v`)**:
+   - Runs in the `always()` post-job hook on ephemeral cloud runners.
+   - The volume was created seconds prior solely for the automated integration test script.
+   - Deleting the test volume with `-v` frees runner disk space and prevents runner state pollution.
+   - **Crucial Rule**: Never run `docker compose down -v` locally unless an intentional full factory reset is required.
+
+
