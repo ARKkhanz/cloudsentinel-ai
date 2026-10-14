@@ -1,3 +1,4 @@
+from datetime import timezone
 from typing import List
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -52,7 +53,7 @@ def get_metrics(
         MetricSample(
             id=r.id,
             service=r.service,
-            timestamp=r.timestamp,
+            timestamp=r.timestamp.replace(tzinfo=timezone.utc) if r.timestamp.tzinfo is None else r.timestamp,
             latency_ms=r.latency_ms,
             error_rate=r.error_rate,
             request_count=r.request_count,

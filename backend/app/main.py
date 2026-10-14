@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.api.routes_demo import router as demo_router
 from backend.app.api.routes_health import router as health_router
 from backend.app.api.routes_metrics import router as metrics_router
 from backend.app.config import settings
@@ -34,6 +35,7 @@ app.add_middleware(
 # Register route modules
 app.include_router(health_router)
 app.include_router(metrics_router)
+app.include_router(demo_router)
 
 
 @app.get("/", include_in_schema=False)
@@ -43,4 +45,5 @@ def root():
         "health": "/health",
         "docs": "/docs",
         "metrics": "/api/metrics",
+        "demo_generate": "/api/demo/generate",
     }
