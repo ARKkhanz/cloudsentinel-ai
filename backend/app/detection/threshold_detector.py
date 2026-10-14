@@ -1,4 +1,5 @@
 from datetime import datetime
+import math
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 
@@ -76,29 +77,54 @@ class ThresholdDetector:
         self.name = name
         self.version = version
 
+    def _validate_finite_number(self, field_name: str, value: Any) -> float:
+        """Validate that a field value is present, non-boolean numeric, and finite."""
+        if value is None:
+            raise ValueError(f"Missing required metric value for '{field_name}' (value cannot be None)")
+        if isinstance(value, bool):
+            raise TypeError(f"Metric field '{field_name}' must be a numerical value, got boolean")
+        try:
+            num = float(value)
+        except (ValueError, TypeError) as exc:
+            raise TypeError(f"Metric field '{field_name}' must be numeric, got {type(value).__name__}") from exc
+
+        if not math.isfinite(num):
+            raise ValueError(f"Metric field '{field_name}' must be finite, got non-finite value {num}")
+        return num
+
     def _extract_metric_fields(self, sample: Union[MetricSample, Any, Dict[str, Any]]) -> Dict[str, Any]:
-        """Normalize sample input from Pydantic model, SQLAlchemy ORM model, or dictionary."""
+        """
+        Normalize and strictly validate sample input from Pydantic model, SQLAlchemy ORM model, or dictionary.
+        Rejects missing required metrics and non-finite values (NaN, infinity).
+        """
+        required_fields = ("latency_ms", "error_rate", "request_count", "cpu_usage_pct", "memory_usage_pct")
         if isinstance(sample, dict):
+            for field in required_fields:
+                if field not in sample:
+                    raise ValueError(f"Missing required numerical metric field: '{field}'")
             return {
                 "service": sample.get("service", "unknown"),
                 "timestamp": sample.get("timestamp"),
                 "id": sample.get("id"),
-                "latency_ms": float(sample.get("latency_ms", 0.0)),
-                "error_rate": float(sample.get("error_rate", 0.0)),
-                "request_count": int(sample.get("request_count", 0)),
-                "cpu_usage_pct": float(sample.get("cpu_usage_pct", 0.0)),
-                "memory_usage_pct": float(sample.get("memory_usage_pct", 0.0)),
+                "latency_ms": self._validate_finite_number("latency_ms", sample["latency_ms"]),
+                "error_rate": self._validate_finite_number("error_rate", sample["error_rate"]),
+                "request_count": int(self._validate_finite_number("request_count", sample["request_count"])),
+                "cpu_usage_pct": self._validate_finite_number("cpu_usage_pct", sample["cpu_usage_pct"]),
+                "memory_usage_pct": self._validate_finite_number("memory_usage_pct", sample["memory_usage_pct"]),
             }
         else:
+            for field in required_fields:
+                if not hasattr(sample, field):
+                    raise ValueError(f"Missing required numerical metric field: '{field}'")
             return {
                 "service": getattr(sample, "service", "unknown"),
-                "timestamp": getattr(sample, "timestamp"),
+                "timestamp": getattr(sample, "timestamp", None),
                 "id": getattr(sample, "id", None),
-                "latency_ms": float(getattr(sample, "latency_ms", 0.0)),
-                "error_rate": float(getattr(sample, "error_rate", 0.0)),
-                "request_count": int(getattr(sample, "request_count", 0)),
-                "cpu_usage_pct": float(getattr(sample, "cpu_usage_pct", 0.0)),
-                "memory_usage_pct": float(getattr(sample, "memory_usage_pct", 0.0)),
+                "latency_ms": self._validate_finite_number("latency_ms", getattr(sample, "latency_ms")),
+                "error_rate": self._validate_finite_number("error_rate", getattr(sample, "error_rate")),
+                "request_count": int(self._validate_finite_number("request_count", getattr(sample, "request_count"))),
+                "cpu_usage_pct": self._validate_finite_number("cpu_usage_pct", getattr(sample, "cpu_usage_pct")),
+                "memory_usage_pct": self._validate_finite_number("memory_usage_pct", getattr(sample, "memory_usage_pct")),
             }
 
     def detect_sample(

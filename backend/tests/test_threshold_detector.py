@@ -252,3 +252,59 @@ def test_16_stable_behavior_when_metrics_include_optional_db_ids():
     sample_no_id = create_sample(latency_ms=250.0, sample_id=None)
     finding_no_id = detector.detect_sample(sample_no_id)
     assert finding_no_id.metric_id is None
+
+
+def test_17_rejects_missing_numerical_metrics():
+    """Verify ThresholdDetector rejects dictionary samples missing required numerical fields or containing None."""
+    detector = ThresholdDetector()
+
+    # Missing error_rate
+    incomplete_dict = {
+        "service": "checkout-service",
+        "timestamp": datetime(2026, 10, 14, 12, 0, 0, tzinfo=timezone.utc),
+        "latency_ms": 100.0,
+        "request_count": 100,
+        "cpu_usage_pct": 30.0,
+        "memory_usage_pct": 40.0,
+    }
+    with pytest.raises(ValueError, match="Missing required numerical metric field: 'error_rate'"):
+        detector.detect_sample(incomplete_dict)
+
+    # Field is None
+    none_val_dict = {**incomplete_dict, "error_rate": None}
+    with pytest.raises(ValueError, match="cannot be None"):
+        detector.detect_sample(none_val_dict)
+
+
+def test_18_rejects_nan_and_infinite_metric_values():
+    """Verify ThresholdDetector rejects non-finite (NaN, Inf) and non-numeric metric values."""
+    detector = ThresholdDetector()
+    base_dict = {
+        "service": "checkout-service",
+        "timestamp": datetime(2026, 10, 14, 12, 0, 0, tzinfo=timezone.utc),
+        "latency_ms": 100.0,
+        "error_rate": 0.01,
+        "request_count": 100,
+        "cpu_usage_pct": 30.0,
+        "memory_usage_pct": 40.0,
+    }
+
+    # NaN latency
+    with pytest.raises(ValueError, match="must be finite, got non-finite value nan"):
+        detector.detect_sample({**base_dict, "latency_ms": float("nan")})
+
+    # Positive Infinity latency
+    with pytest.raises(ValueError, match="must be finite, got non-finite value inf"):
+        detector.detect_sample({**base_dict, "latency_ms": float("inf")})
+
+    # Negative Infinity error_rate
+    with pytest.raises(ValueError, match="must be finite, got non-finite value -inf"):
+        detector.detect_sample({**base_dict, "error_rate": float("-inf")})
+
+    # Non-numeric string value
+    with pytest.raises(TypeError, match="must be numeric"):
+        detector.detect_sample({**base_dict, "latency_ms": "high_latency"})
+
+    # Boolean value
+    with pytest.raises(TypeError, match="got boolean"):
+        detector.detect_sample({**base_dict, "latency_ms": True})
