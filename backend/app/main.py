@@ -1,14 +1,25 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.routes_health import router as health_router
 from backend.app.api.routes_metrics import router as metrics_router
 from backend.app.config import settings
+from backend.app.db.session import init_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Ensure database schema is initialized on startup
+    init_db()
+    yield
+
 
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="CloudSentinel AI — Service Reliability & Metric Ingestion API",
+    lifespan=lifespan,
 )
 
 # Explicit CORS configuration for frontend interaction

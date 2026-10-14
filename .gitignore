@@ -52,4 +52,8 @@ setup_*.ps1
 
 # Database (Day 2+)
 *.db
+*.sqlite
 *.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+backend/data/*.db

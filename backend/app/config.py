@@ -19,6 +19,13 @@ class Settings(BaseModel):
         ).split(",")
         if origin.strip()
     ]
+    
+    # Database configuration with stable absolute path
+    data_dir: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
+    database_url: str = os.getenv(
+        "DATABASE_URL",
+        f"sqlite:///{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'cloudsentinel.db')).replace(os.sep, '/')}",
+    )
 
 
 settings = Settings()

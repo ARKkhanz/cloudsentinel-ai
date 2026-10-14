@@ -203,7 +203,7 @@ export const App: React.FC = () => {
         <div className="metric-card">
           <span className="card-title">Avg CPU / Memory</span>
           <span className="card-value">
-            {avgCpu}% / {avgMemory}%
+            {avgCpu !== '--' ? `${avgCpu}% / ${avgMemory}%` : '--'}
           </span>
           <span className="card-footer">
             {isStale ? 'Stale resource load' : 'Synthetic resource load'}
@@ -280,14 +280,14 @@ export const App: React.FC = () => {
               {!isLoading && !error && sampleCount === 0 && (
                 <tr>
                   <td colSpan={8} className="state-box">
-                    No telemetry observations returned for this service.
+                    No telemetry observations persisted for this service yet. The database is initialized and ready for metric ingestion.
                   </td>
                 </tr>
               )}
 
               {/* Populated State */}
               {samples.map((sample, idx) => (
-                <tr key={`${sample.timestamp}-${idx}`}>
+                <tr key={sample.id ? `metric-${sample.id}` : `${sample.timestamp}-${idx}`}>
                   <td>{formatUtcTimestamp(sample.timestamp)}</td>
                   <td><strong>{sample.service}</strong></td>
                   <td>{sample.latency_ms.toFixed(2)} ms</td>

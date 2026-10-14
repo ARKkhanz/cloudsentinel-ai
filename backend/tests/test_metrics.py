@@ -5,9 +5,28 @@ from fastapi.testclient import TestClient
 from backend.app.schemas.metrics import MetricSample
 
 
-def test_metrics_default_returns_200_and_50_samples(client: TestClient):
-    """Verify default GET /api/metrics returns 50 samples for demo-api."""
+def test_metrics_empty_database_returns_200_and_zero_samples(client: TestClient):
+    """
+    Day 2 Milestone 1 requirement:
+    Verify that when the database is empty, GET /api/metrics returns HTTP 200
+    with an empty data list and total_samples=0, without erroring.
+    """
     response = client.get("/api/metrics")
+    assert response.status_code == 200
+    
+    payload = response.json()
+    assert payload["service"] == "demo-api"
+    assert payload["total_samples"] == 0
+    assert payload["order"] == "descending"
+    assert payload["data"] == []
+
+
+def test_metrics_default_returns_200_and_50_samples(seeded_client: TestClient):
+    """
+    Verify GET /api/metrics returns 50 persisted samples for demo-api.
+    Note: Updated for Day 2 persistence; reads from pre-seeded SQLite database.
+    """
+    response = seeded_client.get("/api/metrics")
     assert response.status_code == 200
     
     payload = response.json()
@@ -18,9 +37,9 @@ def test_metrics_default_returns_200_and_50_samples(client: TestClient):
     assert len(payload["data"]) == 50
 
 
-def test_metrics_custom_parameters_work(client: TestClient):
-    """Verify GET /api/metrics with custom service name and bounded limit."""
-    response = client.get("/api/metrics?service=auth-service&limit=15")
+def test_metrics_custom_parameters_work(seeded_client: TestClient):
+    """Verify GET /api/metrics with custom service name and bounded limit against persisted data."""
+    response = seeded_client.get("/api/metrics?service=auth-service&limit=15")
     assert response.status_code == 200
     
     payload = response.json()
@@ -44,21 +63,20 @@ def test_metrics_invalid_service_rejected_with_422(client: TestClient, invalid_s
     assert response.status_code == 422
 
 
-def test_metrics_conform_to_pydantic_schema(client: TestClient):
-    """Verify that every returned sample strictly conforms to the MetricSample model."""
-    response = client.get("/api/metrics?limit=25")
+def test_metrics_conform_to_pydantic_schema(seeded_client: TestClient):
+    """Verify that every persisted sample retrieved strictly conforms to the MetricSample model."""
+    response = seeded_client.get("/api/metrics?limit=25")
     assert response.status_code == 200
     
     for raw_sample in response.json()["data"]:
-        # Re-validating via Pydantic model ensures all field constraints pass
         validated = MetricSample(**raw_sample)
         assert validated.service == "demo-api"
         assert validated.is_synthetic is True
 
 
-def test_metrics_synthetic_label_on_all_samples(client: TestClient):
+def test_metrics_synthetic_label_on_all_samples(seeded_client: TestClient):
     """Verify that both the response envelope and each sample are explicitly labeled synthetic."""
-    response = client.get("/api/metrics?limit=30")
+    response = seeded_client.get("/api/metrics?limit=30")
     assert response.status_code == 200
     
     payload = response.json()
@@ -66,9 +84,9 @@ def test_metrics_synthetic_label_on_all_samples(client: TestClient):
     assert all(item["is_synthetic"] is True for item in payload["data"])
 
 
-def test_metrics_timestamps_ordered_newest_first(client: TestClient):
+def test_metrics_timestamps_ordered_newest_first(seeded_client: TestClient):
     """Verify timestamps are parseable UTC dates and ordered descending (newest first)."""
-    response = client.get("/api/metrics?limit=20")
+    response = seeded_client.get("/api/metrics?limit=20")
     assert response.status_code == 200
     
     timestamps = [
@@ -81,19 +99,19 @@ def test_metrics_timestamps_ordered_newest_first(client: TestClient):
         assert timestamps[i] >= timestamps[i + 1], f"Order mismatch at index {i}"
 
 
-def test_metrics_reproducibility_deterministic_data(client: TestClient):
-    """Verify that two successive calls with identical parameters produce identical output."""
-    res_1 = client.get("/api/metrics?service=demo-api&limit=10")
-    res_2 = client.get("/api/metrics?service=demo-api&limit=10")
+def test_metrics_reproducibility_deterministic_data(seeded_client: TestClient):
+    """Verify that two successive calls with identical parameters return identical persisted data."""
+    res_1 = seeded_client.get("/api/metrics?service=demo-api&limit=10")
+    res_2 = seeded_client.get("/api/metrics?service=demo-api&limit=10")
     
     assert res_1.status_code == 200
     assert res_2.status_code == 200
     assert res_1.json() == res_2.json()
 
 
-def test_metrics_numeric_values_within_valid_ranges(client: TestClient):
+def test_metrics_numeric_values_within_valid_ranges(seeded_client: TestClient):
     """Verify all numerical fields conform to domain-appropriate telemetry boundaries."""
-    response = client.get("/api/metrics?limit=50")
+    response = seeded_client.get("/api/metrics?limit=50")
     assert response.status_code == 200
     
     for item in response.json()["data"]:

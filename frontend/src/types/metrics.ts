@@ -10,6 +10,7 @@ export interface HealthResponse {
 }
 
 export interface MetricSample {
+  id?: number;
   service: string;
   timestamp: string;
   latency_ms: number;
