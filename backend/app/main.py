@@ -1,0 +1,35 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from backend.app.api.routes_health import router as health_router
+from backend.app.api.routes_metrics import router as metrics_router
+from backend.app.config import settings
+
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    description="CloudSentinel AI — Service Reliability & Metric Ingestion API",
+)
+
+# Explicit CORS configuration for frontend interaction
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Register route modules
+app.include_router(health_router)
+app.include_router(metrics_router)
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    return {
+        "message": "Welcome to CloudSentinel AI API",
+        "health": "/health",
+        "docs": "/docs",
+        "metrics": "/api/metrics",
+    }
