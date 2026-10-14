@@ -328,7 +328,7 @@ CloudSentinel AI runs an automated, multi-job continuous integration pipeline pi
 * **Workflow**: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 * **Runner Environment**: `ubuntu-24.04` (pinned LTS release for deterministic toolchain reproducibility)
 * **Action Runtimes**: Official GitHub Actions (`actions/checkout@v7`, `actions/setup-python@v7`, `actions/setup-node@v7`) running natively on Node 24.
-* **Verified CI Workflow Run**: [Run #38593311494 (100% Green)](https://github.com/ARKkhanz/cloudsentinel-ai/actions/runs/38593311494)
+* **Verified CI Workflow Run**: [Run #38595270489 (100% Green, Zero Warnings)](https://github.com/ARKkhanz/cloudsentinel-ai/actions/runs/38595270489)
 
 ### Automated Pipeline Jobs
 
