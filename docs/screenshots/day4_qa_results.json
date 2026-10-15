@@ -1,5 +1,11 @@
 [
   {
+    "name": "DAY4_PREFLIGHT_DB_SAFETY",
+    "status": "PASS",
+    "observation": "Backend confirmed running on isolated database target: 'day4_evaluator_qa.db'",
+    "evidence": ""
+  },
+  {
     "name": "DAY4_01_Initial_Connection",
     "status": "PASS",
     "observation": "Page title: 'CloudSentinel AI \u2014 Reliability Dashboard', Brand: 'CloudSentinel AI', Health badge: 'BACKEND: ONLINE (CLOUDSENTINEL-BACKEND V0.1.0)'",
@@ -8,31 +14,31 @@
   {
     "name": "DAY4_02_Generate_Synthetic_Telemetry",
     "status": "PASS",
-    "observation": "Generated telemetry: 50 table rows displayed (display limit: 50). Total samples: demo-api.",
-    "evidence": "Feedback: 'Successfully generated and persisted 100 observations with 5 injected anomalies for 'demo-api'.\n\u2715'"
+    "observation": "Generated telemetry: 50 rows displayed (limit 50). Service: 'demo-api', Avg Latency: '66.19 ms'.",
+    "evidence": "Feedback: 'Successfully generated and persisted 100 observations with 5 injected anomalies for 'demo-api'.\n\u2715', Footer: '50 samples (descending)'"
   },
   {
     "name": "DAY4_03_Run_Threshold_Detection",
     "status": "PASS",
-    "observation": "Threshold detection active. Incident table row count: 5. Threshold badge found: True",
+    "observation": "Threshold detection executed. Incident table row count: 5. Threshold badge found: True.",
     "evidence": "Feedback: 'Threshold Detection completed on 100 samples: 5 findings, 5 new incidents created (0 deduplicated).\n\u2715'"
   },
   {
     "name": "DAY4_04_Threshold_Evidence_Inspection",
     "status": "PASS",
-    "observation": "Evidence modal opened: 'Elevated Latency on demo-api (503.7 ms)'",
-    "evidence": "Explanation: 'Observed latency of 503.70 ms exceeded the configured threshold of 150.0 ms (+353.70 ms excess).'. Measurements: ['503.70 ms', '0.31%', '119', '72.5%', '40.2%']"
+    "observation": "Evidence modal opened: 'High Error Rate on demo-api (16.2%)'. Observed latency: '55.44 ms'",
+    "evidence": "Explanation: 'Observed error rate of 16.17% (0.1617) exceeded the configured threshold of 5.0% (0.0500).'"
   },
   {
     "name": "DAY4_05_Run_IsolationForest_Detection",
     "status": "PASS",
-    "observation": "Total incidents now: 10. Detectors present: {'THRESHOLD_BASELINE', 'ISOLATION_FOREST'}",
+    "observation": "Total incidents now: 10. Detectors present: {'ISOLATION_FOREST', 'THRESHOLD_BASELINE'}",
     "evidence": "Feedback: 'IsolationForest Detection completed on 100 samples: 5 findings, 5 new incidents created (0 deduplicated).\n\u2715'"
   },
   {
     "name": "DAY4_06_IsolationForest_Evidence_Inspection",
     "status": "PASS",
-    "observation": "ML evidence modal verified: 'Multivariate Anomaly Detected by IsolationForest on demo-api (score: -0.0011)'. Anomaly score: '-0.0011'",
+    "observation": "ML evidence modal verified: 'Multivariate Anomaly Detected by IsolationForest on demo-api (score: -0.0011)'. Anomaly score: '-0.0011' (negative: True)",
     "evidence": "Explanation: 'IsolationForest classified this observation as an outlier based on its combined numerical telemetry features (latency_ms, error_rate, cpu_usage_pct, memory_usage_pct, request_count). The recorded decision score was -0.0011 (negative decision score indicates isolation in anomalous subspace).'"
   },
   {
@@ -44,25 +50,25 @@
   {
     "name": "DAY4_08_Persistence_Across_Reload",
     "status": "PASS",
-    "observation": "Persisted data restored after reload: 10 incidents, 50 telemetry rows.",
+    "observation": "Persisted data restored after reload: 10 incidents, 50 displayed telemetry rows.",
     "evidence": ""
   },
   {
     "name": "DAY4_09_Mobile_Responsiveness",
     "status": "PASS",
-    "observation": "Mobile viewport (375px) tested. Horizontal overflow: False",
+    "observation": "Mobile viewport (375px) tested. Horizontal overflow detected: False",
     "evidence": ""
   },
   {
     "name": "DAY4_10_Outage_And_Recovery_Handling",
     "status": "PASS",
-    "observation": "Outage induced and recovered cleanly. Health badge: 'BACKEND: ONLINE (CLOUDSENTINEL-BACKEND V0.1.0)', Error banner cleared: True",
+    "observation": "Outage observed: True. Recovered health badge: 'BACKEND: ONLINE (CLOUDSENTINEL-BACKEND V0.1.0)', Error banner cleared: True",
     "evidence": ""
   },
   {
     "name": "DAY4_11_Prototype_Disclaimers",
     "status": "PASS",
-    "observation": "Disclaimers verified. Claims production: False, Has prototype labels: True",
+    "observation": "Disclaimers verified. Claims production: False, Has prototype/synthetic labels: True",
     "evidence": ""
   },
   {

@@ -202,7 +202,7 @@ Detailed scientific analysis, confusion matrices, and qualitative false-positive
 ## API Endpoints Specification
 
 ### 1. `GET /health`
-Readiness probe returning backend health and database connectivity.
+Application and process readiness probe returning service identifier, version, and UTC timestamp. Operational database readiness is verified via telemetry querying and generation routes.
 
 ### 2. `GET /api/metrics`
 Retrieve persisted metrics ordered descending by timestamp.
@@ -296,7 +296,8 @@ python backend/tests/milestone6_browser_qa.py
 # Automated Google Chrome CDP test suite (isolated QA database):
 .\backend\.venv\Scripts\python.exe backend/tests/day4_milestone1_browser_qa.py
 ```
-*Result*: **12/12 PASSED (100%)** in Google Chrome via Chrome DevTools Protocol (CDP):
+*Result*: **13/13 PASSED (100%)** in Google Chrome via Chrome DevTools Protocol (CDP):
+- Preflight database safety check (`DAY4_PREFLIGHT_DB_SAFETY`) protecting user data.
 - Initial connection & health status (`online`).
 - Synthetic telemetry generation (100 observations persisted, 50 rows displayed).
 - Threshold baseline detection (5 incidents created).
@@ -308,7 +309,7 @@ python backend/tests/milestone6_browser_qa.py
 - Mobile viewport (375x667) responsiveness verified with zero horizontal overflow.
 - Simulated backend outage and clean recovery verified via network throttling emulation.
 - Clear prototype disclaimers audit (zero false production claims).
-- Browser console error and network response audit (0 errors).
+- Browser console error and network response audit (0 errors, 0 exceptions).
 
 > [!TIP]
 > Complete walkthroughs for evaluators are documented in [`docs/evaluator-guide.md`](docs/evaluator-guide.md) (featuring a 3-minute Quick Demo and clean-machine setup) and [`docs/day4_milestone1_qa_report.md`](docs/day4_milestone1_qa_report.md).
@@ -352,7 +353,7 @@ CloudSentinel AI runs an automated, multi-job continuous integration pipeline pi
 * **Workflow**: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 * **Runner Environment**: `ubuntu-24.04` (pinned LTS release for deterministic toolchain reproducibility)
 * **Action Runtimes**: Official GitHub Actions (`actions/checkout@v7`, `actions/setup-python@v7`, `actions/setup-node@v7`) running natively on Node 24.
-* **Verified CI Workflow Run**: [Run #38595270489 (100% Green, Zero Warnings)](https://github.com/ARKkhanz/cloudsentinel-ai/actions/runs/38595270489)
+* **Verified CI Workflow Run**: [Run #38733241686 (100% Green, Zero Warnings)](https://github.com/ARKkhanz/cloudsentinel-ai/actions/runs/38733241686)
 
 ### Automated Pipeline Jobs
 
