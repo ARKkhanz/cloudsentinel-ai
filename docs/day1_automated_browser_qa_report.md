@@ -101,7 +101,7 @@ All values match within a numeric tolerance of $\pm 0.05$, confirming authentic 
 ```text
 ============================= test session starts =============================
 platform win32 -- Python 3.11.9, pytest-8.4.2, pluggy-1.6.0
-rootdir: C:\Users\USER\.gemini\antigravity-ide\scratch\cloudsentinel-ai
+rootdir: cloudsentinel-ai
 collected 17 items
 
 backend/tests/test_health.py::test_health_endpoint_returns_200 PASSED    [  5%]

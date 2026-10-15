@@ -70,18 +70,18 @@ Navigate to:
 - **Docker Compose Stack**: [`http://localhost:3000`](http://localhost:3000)
 
 **What to Observe**:
-- The header displays the **CloudSentinel AI** title and an online badge: `BACKEND: ONLINE (CLOUDSENTINEL-BACKEND V0.1.0)`.
+- The header displays the **CloudSentinel AI** title and an online badge: `Backend: Online (cloudsentinel-backend v0.1.0)`.
 - If the database is fresh, the observation table displays *"No telemetry observations persisted for this service yet. Click 'Generate Synthetic Data' to seed the database."*
 
 ### Step 2: Generate Canonical Synthetic Telemetry
 Click the primary button in the action toolbar:
 ```text
-[ ⚡ Generate Synthetic Demo Data ]
+[ ⚡ Generate Synthetic Data ]
 ```
 
 **What to Observe**:
 - An emerald feedback banner appears:
-  `"Successfully generated and persisted 100 observations with 5 injected anomalies for 'demo-api'."`
+  `Successfully generated and persisted 100 observations with 5 injected anomalies for 'demo-api'.`
 - **KPI Summary Cards Update**:
   - *Monitored Service*: `demo-api` (footer shows `50 samples (descending)`)
   - *Average Latency*: ~66.2 ms (baseline mean ~42ms + 3 injected spikes)
@@ -94,21 +94,21 @@ Click the primary button in the action toolbar:
 ### Step 3: Run Threshold Baseline Anomaly Detection
 Click the second action button:
 ```text
-[ 🎯 Run Threshold Detection ]
+[ 📊 Run Threshold Detection ]
 ```
 
 **What to Observe**:
 - A feedback banner confirms:
-  `"Threshold detection complete for 'demo-api': created 5 new incidents."`
+  `Threshold Detection completed on 100 samples: 5 findings, 5 new incidents created (0 deduplicated).`
 - **Active Incidents Table Populates**: 5 threshold incident rows appear:
   - Detector: `THRESHOLD_BASELINE` (v1.0.0).
   - Severities: `WARNING` (for latency spikes exceeding 150.0ms) or `CRITICAL` (for error rate surges exceeding 0.05 / 5.0%).
   - Headlines: Factual summary (e.g., *"Elevated Latency on demo-api (503.7 ms)"* or *"High Error Rate on demo-api (16.2%)"*).
 
 ### Step 4: Inspect Factual Numerical Evidence
-On any incident row, click the **Inspect Evidence** button:
+On any incident row, click the **View Evidence** button:
 ```text
-[ 🔍 Inspect Evidence ]
+[ View Evidence ]
 ```
 
 **What to Observe**:
@@ -122,17 +122,17 @@ On any incident row, click the **Inspect Evidence** button:
 ### Step 5: Run IsolationForest Multivariate ML Detection
 Click the third action button:
 ```text
-[ 🤖 Run IsolationForest Detection ]
+[ 🌲 Run IsolationForest Detection ]
 ```
 
 **What to Observe**:
 - A feedback banner confirms:
-  `"IsolationForest detection complete for 'demo-api': created 5 new incidents."`
+  `IsolationForest Detection completed on 100 samples: 5 findings, 5 new incidents created (0 deduplicated).`
 - **Active Incidents Table Updates**: Total incidents increase from 5 to 10.
 - 5 new incidents display the purple `ISOLATION_FOREST` badge (v1.0.0).
 
 ### Step 6: Inspect Machine Learning Anomaly Score
-Click **Inspect Evidence** on any `ISOLATION_FOREST` incident row:
+Click **View Evidence** on any `ISOLATION_FOREST` incident row:
 
 **What to Observe**:
 - The modal reveals multivariate evidence:
@@ -143,14 +143,14 @@ Click **Inspect Evidence** on any `ISOLATION_FOREST` incident row:
 - Click **Close** (`✕`).
 
 ### Step 7: Demonstrate Deduplication (Alert Fatigue Prevention)
-Click **Run Threshold Detection** a second time:
+Click **📊 Run Threshold Detection** a second time:
 ```text
-[ 🎯 Run Threshold Detection ]
+[ 📊 Run Threshold Detection ]
 ```
 
 **What to Observe**:
 - The feedback banner confirms:
-  `"Threshold detection complete for 'demo-api': 0 new incidents created (5 duplicates suppressed)."`
+  `Threshold Detection completed on 100 samples: 5 findings, 0 new incidents created (5 deduplicated).`
 - The incident table row count **remains exactly 10**.
 - Zero duplicate records are created because the canonical SHA-256 fingerprint matches existing incident `dedup_key` values in SQLite.
 
@@ -324,11 +324,11 @@ cd ..
 
 ### 5. GitHub Actions Continuous Integration
 The complete codebase is continuously verified on every commit using GitHub-hosted `ubuntu-24.04` runners:
-- **Verified 100% Green Run**: [Run 38733241686](https://github.com/ARKkhanz/cloudsentinel-ai/actions/runs/38733241686)
+- **Verified 100% Green Run**: [Run 38746777690](https://github.com/ARKkhanz/cloudsentinel-ai/actions/runs/38746777690)
 - **CI Jobs**:
-  1. `Backend Unit Tests & ML Evaluation` (Ubuntu 24.04, Python 3.11): Pass (38s)
-  2. `Frontend Lint & Production Build` (Ubuntu 24.04, Node 24): Pass (14s)
-  3. `Docker Compose Integration & Persistence` (Ubuntu 24.04, Real Docker): Pass (57s)
+  1. `Frontend Lint & Production Build` (Ubuntu 24.04, Node 24): Pass (17s)
+  2. `Backend Unit Tests & ML Evaluation` (Ubuntu 24.04, Python 3.11): Pass (41s)
+  3. `Docker Compose Integration & Persistence` (Ubuntu 24.04, Real Docker): Pass (50s)
 
 ---
 

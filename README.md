@@ -271,7 +271,8 @@ CloudSentinel AI runs an automated, multi-job continuous integration pipeline pi
 
 * **Workflow Definition**: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 * **Runner Environment**: `ubuntu-24.04`
-* **Verified CI Workflow Run**: [Run #38743996381 (100% Green, All 3 Jobs Passing)](https://github.com/ARKkhanz/cloudsentinel-ai/actions/runs/38743996381)
+* **CI Workflow Dashboard**: [CloudSentinel AI All Workflow Runs](https://github.com/ARKkhanz/cloudsentinel-ai/actions/workflows/ci.yml)
+* **Release Verification Snapshot**: [Run #38746777690 (100% Green, All 3 Jobs Passing)](https://github.com/ARKkhanz/cloudsentinel-ai/actions/runs/38746777690)
 
 ### CI Jobs
 1. **`Frontend Lint & Production Build`** (Node.js 24, `npm ci`, ESLint 10, Vite build): Pass (16s)
@@ -338,3 +339,4 @@ To maintain strict scientific and engineering rigor, CloudSentinel AI adheres to
 - **[ML Experiment Results](docs/experiment-results.md)**: Confusion matrices, mathematical derivation of metrics, and detector comparison analysis.
 - **[Engineering Learning Notes](docs/learning-notes.md)**: Deep dive into architectural tradeoffs, deduplication mechanics, and reliability patterns.
 - **[Container Orchestration Guide](docs/milestone-3-orchestration.md)**: Docker Compose specifications, volume persistence, and networking topology.
+- **[Repository-Wide Consistency & Security Audit](docs/consistency-audit.md)**: Final authoritative audit of project consistency, configuration hygiene, and verified security posture.

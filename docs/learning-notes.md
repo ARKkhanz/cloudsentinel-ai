@@ -102,10 +102,11 @@ In reliability engineering, duplicate alerts cause **alert fatigue**, burying cr
 Running the same detector repeatedly on the same persisted metric records must never create duplicate incidents.
 
 **CloudSentinel Deduplication Strategy**:
-* Identity Key: `dedup_key = f"{service}:{detector_name}:{obs_timestamp_utc_iso}"`.
+* **Deterministic Canonical Fingerprinting**: The current implementation computes a deterministic SHA-256 fingerprint: `dedup_key = f"{service}:{detector_name}:{sha256[:32]}"`. The hash payload combines service name, detector version, detector configuration summary, UTC observation timestamp, and sorted, fixed-precision numerical metric readings. *(Historical note: Milestone 5 initially used a simpler timestamp-based key `f"{service}:{detector_name}:{obs_timestamp_utc_iso}"`, which was upgraded in Milestone 6 to SHA-256 fingerprinting so that distinct metric values at reused timestamps are never falsely suppressed).*
+* **Value-Sensitive Discrimination**: If telemetry values change at a reused timestamp (e.g., during dataset regeneration), the canonical metric string produces a distinct SHA-256 hash, ensuring legitimate shifts are never suppressed.
 * **Cross-Detector Independence**: Because `detector_name` is embedded in the key, running `threshold_baseline` and `isolation_forest` on the exact same sample generates distinct deduplication keys (`demo-api:threshold_baseline:...` vs `demo-api:isolation_forest:...`). Neither detector suppresses the other!
-* **Idempotency**: Repeatedly executing the same detector on the same samples increments `incidents_already_existing` and returns 0 new incidents, keeping the database clean.
-* **Database Constraint**: A unique index on `incidents.dedup_key` guarantees database-level race protection.
+* **Idempotency**: Repeatedly executing the same detector on identical samples increments `incidents_already_existing` and returns 0 new incidents, keeping the database clean.
+* **Database Constraint**: A unique index on `incidents.dedup_key` guarantees database-level race protection and enforces absolute idempotency.
 
 ---
 
