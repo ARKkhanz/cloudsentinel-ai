@@ -321,12 +321,15 @@ To maintain strict scientific and engineering rigor, CloudSentinel AI adheres to
 - **Day 4: Final Verification, Presentation & Portfolio Delivery**
   - [x] **Milestone 1**: Final end-to-end evaluator verification journey (3-min demo & fresh reproduction guides, real Google Chrome CDP automation, 13/13 QA checks, database isolation)
   - [x] **Milestone 2**: Professional portfolio presentation, architecture diagrams (`docs/architecture.md`), visual evidence gallery, and documentation polish
-  - [ ] **Milestone 3**: Final portfolio delivery, interview talking points, and blueprint acceptance signoff *(Planned)*
+  - [x] **Milestone 3**: Final portfolio delivery, interview preparation notes, and four-day blueprint acceptance audit
 
 ---
 
 ## Documentation Directory
 
+- **[Portfolio Walkthrough & Demo Script](docs/portfolio-walkthrough.md)**: 60-second summary, 2-minute technical explanation, 3-minute live demonstration script, engineering highlights, and limitations.
+- **[Technical Interview Preparation](docs/interview-prep.md)**: 15 comprehensive technical interview questions with engineering answers, architecture trade-offs, and resume bullets.
+- **[Four-Day Blueprint Acceptance Audit](docs/final-acceptance.md)**: Day-by-day compliance matrix auditing all blueprint specifications against concrete verification evidence.
 - **[Technical Architecture & Diagrams](docs/architecture.md)**: Detailed Mermaid diagrams for application data flow, Docker networking, and CI automation.
 - **[Evaluator Verification Guide](docs/evaluator-guide.md)**: Plain-English reproduction manual detailing the 3-minute quick demo and fresh clean-machine setup.
 - **[Day 4 End-to-End QA Report](docs/day4_milestone1_qa_report.md)**: Chrome CDP test execution report, negative test proofs, and assertions audit.
