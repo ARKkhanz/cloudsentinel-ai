@@ -29,8 +29,10 @@ Developed as a four-day engineering project following the *CloudSentinel AI Impl
   - [x] **Milestone 2**: Secure backend and frontend Dockerfiles + production Nginx configuration
   - [x] **Milestone 3**: Docker Compose multi-container orchestration, networking, and SQLite volume persistence
   - [x] **Milestone 4**: GitHub Actions CI workflow + real Docker multi-container integration and SQLite persistence verification
-  - [x] **Milestone 5**: Final Day 3 quality gate, CI hardening (`ubuntu-24.04` & Node 24 runtime), volume safety, and engineering audit
-- **Day 4: Final Verification, Presentation & Portfolio Delivery** *(Planned)*
+- **Day 4: Final Verification, Presentation & Portfolio Delivery**
+  - [x] **Milestone 1**: Final end-to-end evaluator verification journey (3-min demo & fresh reproduction guides, real Google Chrome CDP automation, 12/12 QA checks, database isolation)
+  - [ ] **Milestone 2**: Presentation assets, polished diagrams, and visual documentation *(Planned)*
+  - [ ] **Milestone 3**: Final portfolio delivery, interview talking points, and blueprint acceptance signoff *(Planned)*
 
 ---
 
@@ -288,6 +290,28 @@ python backend/tests/milestone6_browser_qa.py
 * IsolationForest Evidence Modal: [`docs/screenshots/milestone6_06_ml_evidence_modal.png`](docs/screenshots/milestone6_06_ml_evidence_modal.png)
 * Persisted Across Reload: [`docs/screenshots/milestone6_07_persisted_after_reload.png`](docs/screenshots/milestone6_07_persisted_after_reload.png)
 * Mobile Responsive Viewport: [`docs/screenshots/milestone6_08_mobile_responsive.png`](docs/screenshots/milestone6_08_mobile_responsive.png)
+
+### 4. Day 4 Automated Evaluator Journey QA
+```bash
+# Automated Google Chrome CDP test suite (isolated QA database):
+.\backend\.venv\Scripts\python.exe backend/tests/day4_milestone1_browser_qa.py
+```
+*Result*: **12/12 PASSED (100%)** in Google Chrome via Chrome DevTools Protocol (CDP):
+- Initial connection & health status (`online`).
+- Synthetic telemetry generation (100 observations persisted, 50 rows displayed).
+- Threshold baseline detection (5 incidents created).
+- Threshold incident numerical evidence modal inspection.
+- IsolationForest multivariate detection (5 ML incidents created, 10 total).
+- IsolationForest decision score and feature subspace evidence modal inspection.
+- Alert deduplication on repeat detection run (0 new duplicates created).
+- SQLite persistence verified across full browser reload.
+- Mobile viewport (375x667) responsiveness verified with zero horizontal overflow.
+- Simulated backend outage and clean recovery verified via network throttling emulation.
+- Clear prototype disclaimers audit (zero false production claims).
+- Browser console error and network response audit (0 errors).
+
+> [!TIP]
+> Complete walkthroughs for evaluators are documented in [`docs/evaluator-guide.md`](docs/evaluator-guide.md) (featuring a 3-minute Quick Demo and clean-machine setup) and [`docs/day4_milestone1_qa_report.md`](docs/day4_milestone1_qa_report.md).
 
 ---
 
