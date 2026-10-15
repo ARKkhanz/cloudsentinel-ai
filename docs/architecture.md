@@ -79,7 +79,7 @@ flowchart TD
 
 ## 3. Diagram B: Multi-Container Docker Architecture
 
-The diagram below illustrates the production container deployment orchestrated via `compose.yaml`, featuring reverse-proxy routing, internal bridge networking, non-root security privileges, and persistent volume storage.
+The diagram below illustrates the multi-container prototype deployment orchestrated via `compose.yaml`, featuring reverse-proxy routing, internal bridge networking (`cloudsentinel-network`), non-root backend user execution, and persistent volume storage.
 
 ```mermaid
 flowchart LR
@@ -87,17 +87,17 @@ flowchart LR
 
     subgraph DockerHost["Docker Host Environment (compose.yaml)"]
         subgraph FrontendContainer["Frontend Container (cloudsentinel-frontend)"]
-            Nginx["Production Nginx Web Server (:80)\nNon-root user 'nginx'"]
+            Nginx["Production Nginx Web Server (:80)\n(Alpine runtime, worker processes drop privileges)"]
             Dist["Pre-compiled Static SPA Assets\n(/usr/share/nginx/html)"]
             Nginx --- Dist
         end
 
-        subgraph BridgeNet["Internal Docker Network (cloudsentinel-net)"]
-            ProxyPass["Nginx Reverse Proxy Pass\nlocation /api/ -> backend:8000\nlocation /health -> backend:8000"]
+        subgraph BridgeNet["Internal Docker Network (cloudsentinel-network)"]
+            ProxyPass["Nginx Reverse Proxy Pass\nlocation /api/ -> http://backend:8000/api/\nlocation /health -> http://backend:8000/health"]
         end
 
         subgraph BackendContainer["Backend Container (cloudsentinel-backend)"]
-            Uvicorn["FastAPI ASGI Uvicorn (:8000)\nNon-root user 'cloudsentinel' (UID 10001)"]
+            Uvicorn["FastAPI ASGI Uvicorn (:8000)\nNon-root system user 'cloudsentinel'"]
             AppCode["Application Code (/app/backend)"]
             SQLAlchemy["SQLAlchemy 2.x Session Engine"]
             Uvicorn --- AppCode
@@ -105,13 +105,14 @@ flowchart LR
         end
 
         subgraph VolumeStorage["Persistent Volume Storage"]
-            NamedVol[("Named Storage Volume\n(cloudsentinel-data)\nMounted at /app/data\nSQLite: cloudsentinel.db")]
+            NamedVol[("Named Storage Volume\n(cloudsentinel-data)\nMounted at /app/backend/data\nSQLite: cloudsentinel.db")]
         end
     end
 
-    User -->|HTTP :3000| Nginx
+    User -->|HTTP 127.0.0.1:3000 -> :80| Nginx
+    User -.->|Direct Loopback 127.0.0.1:8000 -> :8000| Uvicorn
     Nginx --> ProxyPass
-    ProxyPass -->|HTTP :8000 (Internal DNS)| Uvicorn
+    ProxyPass -->|HTTP :8000 (Internal DNS: backend)| Uvicorn
     SQLAlchemy -->|Read / Write ACID| NamedVol
 ```
 
@@ -171,9 +172,9 @@ flowchart TD
 | :--- | :--- | :--- |
 | **Telemetry Format** | Pydantic `MetricSample` (`timestamp`, `service`, `latency_ms`, `error_rate`, `request_count`, `cpu_usage_pct`, `memory_usage_pct`) | [`backend/app/schemas/metrics.py`](../backend/app/schemas/metrics.py) |
 | **Threshold Rules** | `latency_ms > 150.0` (z > 21 baseline) and `error_rate > 0.05` (z > 22 baseline) | [`backend/app/detection/threshold_detector.py`](../backend/app/detection/threshold_detector.py) |
-| **IsolationForest Features** | 5 fixed features: `latency_ms`, `error_rate`, `cpu_usage_pct`, `memory_usage_pct`, `request_count` | [`backend/app/detection/isolation_forest_detector.py`](../backend/app/detection/isolation_forest_detector.py) |
+| **IsolationForest Features** | 5 fixed features: `latency_ms`, `error_rate`, `cpu_usage_pct`, `memory_usage_pct`, `request_count` (`contamination=0.05`, `n_estimators=100`, `random_state=42`) | [`backend/app/detection/isolation_forest_detector.py`](../backend/app/detection/isolation_forest_detector.py) |
 | **Deduplication Key** | `service:detector:sha256[:32]` stored in `dedup_key` (VARCHAR 160 UNIQUE) | [`backend/app/services/incident_service.py`](../backend/app/services/incident_service.py) |
 | **API Endpoints** | `/health`, `/api/metrics`, `/api/demo/generate`, `/api/detection/run`, `/api/incidents`, `/api/incidents/{id}` | [`backend/app/main.py`](../backend/app/main.py) |
-| **Database Schema** | SQLite with SQLAlchemy ORM (`metric_samples`, `incidents`), WAL mode, auto-schema migration | [`backend/app/models/`](../backend/app/models/) |
-| **Container Networking** | Internal bridge `cloudsentinel-net`, Nginx reverse proxy on port 3000, Uvicorn on port 8000 | [`compose.yaml`](../compose.yaml) |
+| **Database Schema** | SQLite via SQLAlchemy ORM (`metric_samples`, `incidents`), WAL mode, mounted at `/app/backend/data` | [`backend/app/models/`](../backend/app/models/) |
+| **Container Networking** | Internal bridge `cloudsentinel-network`, Nginx proxy bound to `127.0.0.1:3000:80`, Uvicorn bound to `127.0.0.1:8000:8000` | [`compose.yaml`](../compose.yaml) |
 | **CI Automation** | Multi-job workflow on `ubuntu-24.04`, Python 3.11, Node 24, real Docker integration | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) |

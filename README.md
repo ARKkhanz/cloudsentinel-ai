@@ -23,11 +23,11 @@ Modern cloud infrastructure produces high-velocity telemetry (latency, error rat
 1. **Alert Fatigue**: Naive detection rules spam on-call engineers with duplicate alerts for ongoing degradation.
 2. **Opaque "Black Box" Warnings**: Anomaly alerts often fail to explain *why* an observation was flagged, leaving developers without verifiable evidence.
 
-**CloudSentinel AI** demonstrates an end-to-end, reproducible solution to both problems:
-- **Dual Detection Paradigms**: A deterministic **Threshold Baseline Detector** (`latency_ms > 150.0`, `error_rate > 0.05`) and an unsupervised **IsolationForest Machine Learning Detector** (evaluating 5 multivariate features).
-- **Factual Evidence Chains**: Every created incident preserves an immutable snapshot of observed telemetry measurements alongside explicit mathematical boundaries (threshold excess or decision path score).
-- **Canonical SHA-256 Deduplication**: Incidents compute a deterministic SHA-256 fingerprint over the service, detector configuration, observation timestamp, and canonicalized numerical measurements, guaranteeing that repeat detection passes create **zero duplicate alerts**.
-- **Production Architecture**: A responsive React 18 + TypeScript single-page application served either standalone via Vite or containerized behind an unprivileged Nginx reverse proxy concealing internal Docker networks.
+**CloudSentinel AI** is a CI-verified, Docker Compose-based reliability engineering prototype demonstrating an end-to-end, reproducible solution to both problems:
+- **Dual Detection Paradigms**: A deterministic **Threshold Baseline Detector** (`latency_ms > 150.0`, `error_rate > 0.05`) and an unsupervised **IsolationForest Machine Learning Detector** (evaluating 5 canonical multivariate features).
+- **Factual Evidence Chains**: Every created incident preserves an immutable snapshot of observed telemetry measurements alongside explicit mathematical boundaries (threshold excess or tree isolation decision scores).
+- **Deterministic Alert Deduplication**: Incidents compute a deterministic SHA-256 fingerprint over the service, detector identity, version, configuration, observation timestamp, and canonicalized numerical measurements, ensuring that identical detector observations generate zero duplicate incident records.
+- **Containerized Prototype Architecture**: A responsive React 18 + TypeScript single-page application served either standalone via Vite or containerized behind an Nginx reverse proxy routing to an internal FastAPI backend on an isolated Docker bridge network.
 
 ---
 
@@ -36,12 +36,12 @@ Modern cloud infrastructure produces high-velocity telemetry (latency, error rat
 - **Synthetic Telemetry Generation**: Seeded, deterministic generation (`Seed 42`) producing sine-wave baseline traffic with Gaussian noise and 5 controlled anomaly injections (3 latency spikes, 2 error surges).
 - **Dual Anomaly Detection**:
   - *Statistical Threshold*: $O(1)$ deterministic evaluation capturing univariate spikes exceeding statistical baselines ($z > 21$ on latency, $z > 22$ on error rate).
-  - *IsolationForest (Scikit-Learn)*: Unsupervised multivariate tree isolation across 5 numerical dimensions (`latency_ms`, `error_rate`, `cpu_usage_pct`, `memory_usage_pct`, `request_count`).
-- **Forensic Investigation Modal**: Interactive UI dialog displaying observed measurements, threshold breach deltas, tree isolation decision scores, and model parameters.
-- **Deduplication Engine**: Unique `dedup_key` constraint in SQLite preventing redundant alerts across repeated detector runs.
+  - *IsolationForest (Scikit-Learn)*: Unsupervised multivariate tree isolation across 5 canonical numerical dimensions (`latency_ms`, `error_rate`, `cpu_usage_pct`, `memory_usage_pct`, `request_count`) with `contamination=0.05` and `n_estimators=100`.
+- **Forensic Investigation Modal**: Interactive UI dialog displaying observed measurements, threshold breach deltas, tree isolation decision scores, and model hyperparameters.
+- **Deduplication Engine**: Unique `dedup_key` constraint in SQLite preventing redundant alerts for identical observation findings across repeated detector runs.
 - **ACID Persistence**: SQLite storage engine via SQLAlchemy 2.x ORM with write-ahead logging (WAL) and automatic table initialization.
 - **Frontend Resilience**: Automatic detection of backend disconnection, displaying a stale cached telemetry warning and retry button without locking the UI.
-- **Multi-Container Docker Deployment**: Production-ready Nginx reverse proxy routing traffic to an internal FastAPI ASGI container with non-root security privileges and persistent SQLite named volumes.
+- **Multi-Container Docker Deployment**: Nginx reverse proxy routing traffic to an internal FastAPI ASGI container running as an unprivileged system user (`cloudsentinel`) with persistent SQLite named volumes (`cloudsentinel-data`).
 - **Automated CI Quality Gates**: Three-job GitHub Actions pipeline testing backend unit tests, ML benchmarks, frontend lint/build, and live multi-container Docker persistence.
 
 ---
@@ -50,14 +50,14 @@ Modern cloud infrastructure produces high-velocity telemetry (latency, error rat
 
 | Layer | Technology | Purpose |
 | :--- | :--- | :--- |
-| **Frontend UI** | React 18 + TypeScript + Vite | Reactive single-page application, action controls toolbar, KPI summary cards, telemetry table, and incident evidence modal |
-| **Styling** | Vanilla CSS (Dark Mode) | Glassmorphic design, responsive flexbox/grid layout, CSS variables, zero runtime CSS overhead |
+| **Frontend UI** | React 18 + TypeScript + Vite | Reactive single-page application with KPI summary cards, telemetry table, incident listings, and evidence modals |
+| **Styling** | Vanilla CSS (Dark Theme) | Custom CSS properties (`:root`), responsive flexbox/grid layout, and zero runtime CSS dependencies (no TailwindCSS) |
 | **Backend API** | Python 3.11 + FastAPI + Uvicorn | High-performance ASGI web service, route handlers, CORS middleware, and detection pipelines |
 | **Machine Learning** | Scikit-Learn 1.5.2 + NumPy | Unsupervised multivariate IsolationForest anomaly detection with reproducible random seeds |
 | **Validation** | Pydantic v2 | Strict request validation, response serialization, and timestamp normalization |
 | **Persistence** | SQLite + SQLAlchemy 2.x ORM | ACID persistence for metric samples and deduplicated incident evidence snapshots |
-| **Web Server / Proxy** | Nginx (Alpine) | Production reverse proxy serving static SPA bundles and proxying `/api/` and `/health` |
-| **Containerization** | Docker + Docker Compose v2 | Multi-container orchestration, non-root system users, internal bridge network, and named volumes |
+| **Web Server / Proxy** | Nginx (Alpine) | Reverse proxy serving pre-compiled static SPA assets and proxying `/api/` and `/health` to backend |
+| **Containerization** | Docker + Docker Compose v2 | Multi-container orchestration, non-root backend user (`cloudsentinel`), internal bridge network (`cloudsentinel-network`), and named volume persistence |
 | **Testing** | pytest + TestClient + Chrome CDP | 114 backend tests (100% pass) + 13-check automated Google Chrome browser QA test suite |
 | **Continuous Integration** | GitHub Actions (`ubuntu-24.04`) | Automated multi-job workflow verifying code quality, Docker containers, and persistence |
 
@@ -108,11 +108,11 @@ The following genuine screenshots demonstrate the end-to-end user workflow captu
 
 | Feature / Workflow | Visual Evidence | Key Details |
 | :--- | :---: | :--- |
-| **1. Telemetry & KPI Cards** | ![Generated Metrics](docs/screenshots/day4_02_metrics_generated.png) | 100 observations generated, 50 rows displayed in UI table (display limit), calculated KPI averages. |
+| **1. Telemetry & KPI Cards** | ![Generated Metrics](docs/screenshots/day4_02_metrics_generated.png) | 100 observations generated, latest 50 rows displayed in telemetry table, calculated KPI summary cards. |
 | **2. Threshold Detection** | ![Threshold Incidents](docs/screenshots/day4_03_threshold_detection.png) | 5 `THRESHOLD_BASELINE` incidents generated with `WARNING` and `CRITICAL` severity badges. |
 | **3. Threshold Evidence Modal** | ![Threshold Modal](docs/screenshots/day4_04_threshold_evidence_modal.png) | Factual comparison of observed metric readings against configured threshold boundaries (`latency_ms > 150.0`, `error_rate > 0.05`). |
 | **4. IsolationForest ML Incidents** | ![ML Incidents](docs/screenshots/day4_05_isolation_forest_detection.png) | 10 total incidents showing both threshold rules and multivariate IsolationForest findings. |
-| **5. ML Evidence Modal** | ![ML Modal](docs/screenshots/day4_06_ml_evidence_modal.png) | Raw Scikit-Learn decision score (e.g. `-0.0011`), model hyperparameters (`100` trees, `0.05` contamination), and feature space. |
+| **5. ML Evidence Modal** | ![ML Modal](docs/screenshots/day4_06_ml_evidence_modal.png) | Raw Scikit-Learn decision score (e.g. `-0.0011`), model hyperparameters (`100` trees, `0.05` contamination), and 5-feature vector. |
 | **6. Mobile Responsiveness** | ![Mobile Viewport](docs/screenshots/day4_08_mobile_responsive.png) | 375×667 mobile viewport layout showing stacked controls and zero horizontal overflow. |
 | **7. Resilient Outage Recovery** | ![Backend Recovery](docs/screenshots/day4_09_backend_recovery.png) | Stale cached data warning banner displayed upon network drop, clearing cleanly upon reconnect. |
 
@@ -126,12 +126,14 @@ The following genuine screenshots demonstrate the end-to-end user workflow captu
    - Defaults: `latency_ms > 150.0ms` (normal $\mu=42\text{ms}, \sigma=5\text{ms}$; $z > 21$) and `error_rate > 0.05` (normal $\mu=0.5\%, \sigma=0.2\%$; $z > 22$).
    - Characteristics: $O(1)$ execution time, deterministic, completely explainable.
 2. **IsolationForest Multivariate Detector (`isolation_forest`)**:
-   - Fits an ensemble of 100 isolation trees over reference normal telemetry.
+   - Fits an ensemble of 100 isolation trees (`n_estimators=100`, `contamination=0.05`, `random_state=42`) over clean baseline training telemetry (100 normal samples, Seed 100, 0 injected anomalies).
    - Evaluates **5 canonical numerical dimensions**: `latency_ms`, `error_rate`, `cpu_usage_pct`, `memory_usage_pct`, `request_count`.
    - Characteristics: Unsupervised, detects multi-variable correlation anomalies without manual thresholds.
 
 ### Benchmark Evaluation (Canonical Synthetic Dataset)
-Executed via `backend/scripts/evaluate_detectors.py` (Evaluation set: 100 samples, 5 injected anomalies):
+Executed via `backend/scripts/evaluate_detectors.py`:
+- **Training Baseline**: 100 normal samples, Seed 100 (0 injected anomalies).
+- **Evaluation Dataset**: 100 samples, Seed 42 (5 injected anomalies: 3 latency spikes, 2 error rate surges).
 
 | Metric | Threshold Baseline | IsolationForest |
 | :--- | :---: | :---: |
@@ -142,35 +144,36 @@ Executed via `backend/scripts/evaluate_detectors.py` (Evaluation set: 100 sample
 | **Confusion Matrix** | `[[TN=95, FP=0], [FN=0, TP=5]]` | `[[TN=94, FP=1], [FN=1, TP=4]]` |
 
 > [!NOTE]
-> **Scientific Scope Note**: The 1.0 F1 score achieved by the threshold detector is an artifact of synthetic injection magnitudes exceeding static boundaries by design. The benchmark demonstrates detector execution and evaluation math; real-world production environments involve complex multi-variable drift and non-linear patterns.
+> **Scientific Scope Note**: The 1.00 F1 score achieved by the threshold detector is an artifact of synthetic injection magnitudes exceeding static boundaries by design. The benchmark demonstrates detector execution and evaluation math; real-world production environments involve complex multi-variable drift and non-linear patterns.
 
 ---
 
 ## Quick Start & Reproduction
 
-### Option A: Local Development Setup (~3 Minutes if prerequisites installed)
+> [!NOTE]
+> **Setup Time Notice**: Fresh dependency installation (Python packages, Node modules, or Docker image builds) duration varies depending on internet connectivity and hardware. Once prerequisites are installed and services started, exploring the full end-to-end demo takes approximately 3 minutes.
+> For the complete step-by-step evaluator journey, see the [`Evaluator Verification Guide`](docs/evaluator-guide.md).
 
-#### 1. Clone & Set Up Backend
-```bash
+### Option 1: Local Development (Windows PowerShell)
+
+#### Step 1: Backend Service (from repository root)
+```powershell
+# Clone repository and enter directory
 git clone https://github.com/ARKkhanz/cloudsentinel-ai.git
 cd cloudsentinel-ai
 
-# Windows (PowerShell):
+# Create and activate virtual environment
 python -m venv backend/.venv
-.\backend\.venv\Scripts\activate
-pip install -r backend/requirements.txt
-python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+.\backend\.venv\Scripts\Activate.ps1
 
-# Linux / macOS (bash):
-python3 -m venv backend/.venv
-source backend/.venv/bin/activate
+# Install dependencies and start Uvicorn from repository root
 pip install -r backend/requirements.txt
 python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 ```
 
-#### 2. Set Up Frontend (In a second terminal)
-```bash
-cd frontend
+#### Step 2: Frontend Dashboard (in a second PowerShell terminal)
+```powershell
+cd cloudsentinel-ai/frontend
 npm ci
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
@@ -178,30 +181,59 @@ Open [`http://127.0.0.1:5173`](http://127.0.0.1:5173) in your browser.
 
 ---
 
-### Option B: Multi-Container Docker Compose Stack
+### Option 2: Local Development (Linux / macOS)
 
-If Docker and Docker Compose are installed:
+#### Step 1: Backend Service (from repository root)
 ```bash
-# Build images and start containers:
+# Clone repository and enter directory
+git clone https://github.com/ARKkhanz/cloudsentinel-ai.git
+cd cloudsentinel-ai
+
+# Create and activate virtual environment
+python3 -m venv backend/.venv
+source backend/.venv/bin/activate
+
+# Install dependencies and start Uvicorn from repository root
+pip install -r backend/requirements.txt
+python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+```
+
+#### Step 2: Frontend Dashboard (in a second terminal)
+```bash
+cd cloudsentinel-ai/frontend
+npm ci
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+Open [`http://127.0.0.1:5173`](http://127.0.0.1:5173) in your browser.
+
+---
+
+### Option 3: Multi-Container Docker Compose Stack
+
+If Docker and Docker Compose v2 are installed on your system:
+
+```bash
+# Clone and enter directory
+git clone https://github.com/ARKkhanz/cloudsentinel-ai.git
+cd cloudsentinel-ai
+
+# Build container images and start services in detached mode
 docker compose up --build -d
 
-# Verify running services:
+# Verify container health and status
 docker compose ps
 
-# Access application:
-# React Dashboard (via Nginx proxy): http://localhost:3000
-# Backend Health Probe:              http://localhost:3000/health
-# OpenAPI / Swagger Docs:            http://localhost:8000/docs
+# Access services:
+# React Dashboard (via Nginx reverse proxy): http://localhost:3000
+# Backend Health Probe (proxied):           http://localhost:3000/health
+# OpenAPI / Swagger Docs (direct loopback):  http://localhost:8000/docs
 
-# Safe teardown preserving SQLite data volume:
+# Safe teardown preserving SQLite named data volume:
 docker compose down
 ```
 
 > [!WARNING]
-> Always run `docker compose down` (WITHOUT `-v`). The `-v` flag deletes the named storage volume (`cloudsentinel-data`), destroying all persisted telemetry and incidents.
-
-> [!TIP]
-> Complete walkthroughs for technical evaluators are documented in [`docs/evaluator-guide.md`](docs/evaluator-guide.md).
+> Use `docker compose down` (WITHOUT `-v`). Appending `-v` deletes the named storage volume (`cloudsentinel-data`), destroying all persisted telemetry and incident evidence.
 
 ---
 
@@ -211,7 +243,7 @@ All quality checks are executable from the repository root:
 
 ```bash
 # 1. Full Backend Pytest Suite (114 tests):
-.\backend\.venv\Scripts\python.exe -m pytest -v
+python -m pytest -v
 
 # 2. Frontend ESLint 10 Check:
 cd frontend && npm run lint && cd ..
@@ -220,11 +252,11 @@ cd frontend && npm run lint && cd ..
 cd frontend && npm run build && cd ..
 
 # 4. Reproducible ML Benchmark Evaluation:
-.\backend\.venv\Scripts\python.exe backend/scripts/evaluate_detectors.py
+python backend/scripts/evaluate_detectors.py
 
 # 5. Real Google Chrome DevTools Protocol (CDP) Automated Browser QA:
 # (Ensure backend was started with isolated DATABASE_URL and frontend is on :5173)
-.\backend\.venv\Scripts\python.exe backend/tests/day4_milestone1_browser_qa.py
+python backend/tests/day4_milestone1_browser_qa.py
 ```
 - **Backend Test Status**: `114 passed, 0 failed` in ~13.8s across all 8 test modules.
 - **Frontend Lint Status**: `0 errors, 0 warnings`.
@@ -239,25 +271,28 @@ CloudSentinel AI runs an automated, multi-job continuous integration pipeline pi
 
 * **Workflow Definition**: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 * **Runner Environment**: `ubuntu-24.04`
-* **Verified CI Workflow Run**: [Run #38737264452 (100% Green, Zero Warnings)](https://github.com/ARKkhanz/cloudsentinel-ai/actions/runs/38737264452)
+* **Verified CI Workflow Run**: [Run #38740615302 (100% Green, All 3 Jobs Passing)](https://github.com/ARKkhanz/cloudsentinel-ai/actions/runs/38740615302)
 
 ### CI Jobs
-1. **`Frontend Lint & Production Build`** (Node.js 24, `npm ci`, ESLint 10, Vite build): Pass (14s)
-2. **`Backend Unit Tests & ML Evaluation`** (Python 3.11, 114 pytest tests, `evaluate_detectors.py` benchmark): Pass (41s)
-3. **`Docker Compose Integration & Persistence`** (Multi-container build, health probes, synthetic generation, dual detection, deduplication, SQLite named volume persistence): Pass (1m 0s)
+1. **`Frontend Lint & Production Build`** (Node.js 24, `npm ci`, ESLint 10, Vite build): Pass (19s)
+2. **`Backend Unit Tests & ML Evaluation`** (Python 3.11, 114 pytest tests, `evaluate_detectors.py` benchmark): Pass (36s)
+3. **`Docker Compose Integration & Persistence`** (Multi-container build, health probes, synthetic generation, dual detection, deduplication, SQLite named volume persistence): Pass (46s)
 
 ---
 
 ## Security, Scientific Truthfulness & Limitations
 
 To maintain strict scientific and engineering rigor, CloudSentinel AI adheres to these documented boundaries:
-1. **Synthetic Telemetry Scope**: All metric observations are synthetically generated using mathematical distributions to model latency spikes and error surges deterministically. It is not live production traffic.
-2. **Ground Truth Isolation**: Synthetic injection labels (`is_anomaly=True`) are isolated exclusively for post-detection scoring and are never fed into detector feature vectors.
+1. **Synthetic Telemetry Scope**: All metric observations are synthetically generated using mathematical distributions to model latency spikes and error surges deterministically. It does not ingest live production traffic.
+2. **Ground Truth Isolation**: Synthetic injection labels (`is_anomaly=True`) are isolated exclusively for post-detection evaluation and are never fed into detector feature vectors.
 3. **No Root-Cause Fabrication**: The prototype surfaces factual mathematical evidence (breached thresholds and decision scores). It does **NOT** diagnose or fabricate narrative root causes (e.g. claiming a memory leak or database deadlock).
 4. **Unsupervised ML Score Meaning**: Negative IsolationForest anomaly scores indicate tree traversal isolation depth, **NOT** calibrated failure probabilities.
 5. **No Destructive Auto-Remediation**: CloudSentinel AI is an observability and decision-support prototype. It does not execute automated restarts or infrastructure mutations.
 6. **No Future Outage Forecasting**: Detectors identify statistical deviations in observed telemetry; they do not forecast future failure timestamps.
-7. **Security Hygiene**: Container definitions use unprivileged users (`cloudsentinel` UID 10001, `nginx`), specific pinned base images, explicit CORS policies, and zero committed credentials.
+7. **Deduplication Scope**: Deduplication eliminates redundant incident records for identical detector observations matching the fingerprint `(service, detector, version, config, timestamp, canonical_metrics)`, but does not claim to eliminate all forms of operational alert storms across distributed systems.
+8. **Security Boundary & Prototype Posture**:
+   - *Implemented Prototype Security*: Dedicated non-root backend user (`cloudsentinel`), host loopback port bindings (`127.0.0.1:3000`, `127.0.0.1:8000`), internal bridge network (`cloudsentinel-network`), strict CORS configuration, zero committed credentials or local database files.
+   - *Production Security Considerations Outside Scope*: Enterprise TLS/SSL termination with public CA certificates, secret managers/KMS integration, rootless Docker daemon execution, and container image digest pinning.
 
 ---
 
