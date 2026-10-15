@@ -86,6 +86,7 @@ Modern cloud infrastructure produces high-velocity telemetry (latency, error rat
 [FastAPI REST API / Uvicorn :8000]
        │ GET  /health              -> Application process responsiveness check
        │ GET  /api/metrics         -> Query persisted telemetry observations
+       │ POST /api/metrics         -> Ingest single validated metric observation
        │ POST /api/demo/generate   -> Seed synthetic telemetry with injected anomalies
        │ POST /api/detection/run   -> Trigger detection pipeline & generate incidents
        │ GET  /api/incidents       -> Retrieve persisted incident records (newest first)
@@ -99,6 +100,37 @@ Modern cloud infrastructure produces high-velocity telemetry (latency, error rat
 
 > [!TIP]
 > Complete architectural diagrams (Application Data Flow, Multi-Container Docker Network, and CI Pipeline) are documented in [`docs/architecture.md`](docs/architecture.md).
+
+---
+
+## Complete REST API Reference
+
+The FastAPI backend exposes 7 fully implemented, verified endpoints:
+
+| Method | Endpoint | Purpose | Expected Inputs | Response Behavior | Persistence (DB) |
+| :--- | :--- | :--- | :--- | :--- | :---: |
+| `GET` | `/health` | Process liveness probe | None | HTTP 200: `{"status": "ok", "service": "cloudsentinel-backend", "version": "0.1.0", "database": "connected"}` | Read-only |
+| `GET` | `/api/metrics` | Retrieve persisted telemetry observations | Query: `service: str = "demo-api"`, `limit: int = 50` (1..200) | HTTP 200: `MetricListResponse` (ordered newest-first) | Read-only |
+| `POST` | `/api/metrics` | Ingest and persist a single validated telemetry observation | Body: `MetricSampleCreate` (JSON) | HTTP 201: `MetricSample` with database ID; invalid bounds rejected with HTTP 422 | **Write** (`metric_samples`) |
+| `POST` | `/api/demo/generate` | Generate and persist reproducible synthetic telemetry | Body: `DemoGenerateRequest` (`count=100`, `seed=42`, `service="demo-api"`) | HTTP 201: `DemoGenerateResponse` (summary of generated samples & injected anomalies) | **Write** (`metric_samples`) |
+| `POST` | `/api/detection/run` | Execute detector on telemetry & persist deduplicated incidents | Body: `DetectionRunRequest` (`detector="threshold_baseline" \| "isolation_forest"`, `service="demo-api"`, `limit=100`) | HTTP 200: `DetectionRunResponse` (findings, incidents created, duplicates suppressed) | **Write** (`incidents`) |
+| `GET` | `/api/incidents` | List persisted incidents with optional filtering | Query: `service: Optional[str]`, `detector: Optional[str]`, `status: Optional[str]`, `limit: int = 50` | HTTP 200: `IncidentListResponse` (ordered newest-first) | Read-only |
+| `GET` | `/api/incidents/{id}` | Retrieve forensic evidence snapshot for specific incident | Path: `id: str` (UUID) | HTTP 200: `IncidentDetailResponse` (evidence snapshot, decision scores); HTTP 404 if not found | Read-only |
+
+### Telemetry Ingestion Payload Example (`POST /api/metrics`)
+```json
+{
+  "service": "payment-service",
+  "timestamp": "2026-10-15T12:00:00Z",
+  "latency_ms": 42.5,
+  "error_rate": 0.01,
+  "request_count": 120,
+  "cpu_usage_pct": 35.2,
+  "memory_usage_pct": 48.0,
+  "is_synthetic": true
+}
+```
+Validation rules: `latency_ms >= 0.0`, `error_rate` in `[0.0, 1.0]`, `request_count >= 0`, `cpu_usage_pct` and `memory_usage_pct` in `[0.0, 100.0]`. Out-of-bounds inputs return HTTP 422 Unprocessable Entity.
 
 ---
 
@@ -324,19 +356,16 @@ To maintain strict scientific and engineering rigor, CloudSentinel AI adheres to
 - **Day 4: Final Verification, Presentation & Portfolio Delivery**
   - [x] **Milestone 1**: Final end-to-end evaluator verification journey (3-min demo & fresh reproduction guides, real Google Chrome CDP automation, 13/13 QA checks, database isolation)
   - [x] **Milestone 2**: Professional portfolio presentation, architecture diagrams (`docs/architecture.md`), visual evidence gallery, and documentation polish
-  - [x] **Milestone 3**: Final portfolio delivery, interview preparation notes, and four-day blueprint acceptance audit
+  - [x] **Milestone 3**: Final portfolio delivery, technical documentation, and four-day blueprint completion audit
 
 ---
 
 ## Documentation Directory
 
 - **[Portfolio Walkthrough & Demo Script](docs/portfolio-walkthrough.md)**: 60-second summary, 2-minute technical explanation, 3-minute live demonstration script, engineering highlights, and limitations.
-- **[Technical Interview Preparation](docs/interview-prep.md)**: 15 comprehensive technical interview questions with engineering answers, architecture trade-offs, and resume bullets.
-- **[Four-Day Blueprint Acceptance Audit](docs/final-acceptance.md)**: Day-by-day compliance matrix auditing all blueprint specifications against concrete verification evidence.
 - **[Technical Architecture & Diagrams](docs/architecture.md)**: Detailed Mermaid diagrams for application data flow, Docker networking, and CI automation.
 - **[Evaluator Verification Guide](docs/evaluator-guide.md)**: Plain-English reproduction manual detailing the 3-minute quick demo and fresh clean-machine setup.
 - **[Day 4 End-to-End QA Report](docs/day4_milestone1_qa_report.md)**: Chrome CDP test execution report, negative test proofs, and assertions audit.
 - **[ML Experiment Results](docs/experiment-results.md)**: Confusion matrices, mathematical derivation of metrics, and detector comparison analysis.
-- **[Engineering Learning Notes](docs/learning-notes.md)**: Deep dive into architectural tradeoffs, deduplication mechanics, and reliability patterns.
+- **[Engineering Learning Notes & Technical Glossary](docs/learning-notes.md)**: Deep dive into architectural tradeoffs, deduplication mechanics, reliability patterns, and full technical glossary.
 - **[Container Orchestration Guide](docs/milestone-3-orchestration.md)**: Docker Compose specifications, volume persistence, and networking topology.
-- **[Repository-Wide Consistency & Security Audit](docs/consistency-audit.md)**: Final authoritative audit of project consistency, configuration hygiene, and verified security posture.

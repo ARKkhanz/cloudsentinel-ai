@@ -41,6 +41,7 @@ Modern cloud infrastructure produces high-velocity telemetry (latency, error rat
 [FastAPI REST API]
        │ GET  /health              -> Application process responsiveness check
        │ GET  /api/metrics         -> Query persisted telemetry observations
+       │ POST /api/metrics         -> Ingest single validated metric observation
        │ POST /api/demo/generate   -> Seed synthetic telemetry with injected anomalies
        │ POST /api/detection/run   -> Trigger detection pipeline & generate incidents
        │ GET  /api/incidents       -> Retrieve persisted incident records (newest first)
@@ -164,7 +165,14 @@ Press `F5` or `Ctrl+R` in your browser to reload the page.
 
 ## 4. Journey B: Fresh Reproduction from Clean Machine
 
-*Designed for an evaluator setting up the project on a clean workstation.*
+*Designed for an evaluator reproducing the project from scratch on a clean workstation.*
+
+> [!NOTE]
+> **Evaluation Mode & Environment Distinction**:
+> - **Prepared Demonstration (Journey A)**: Validates functional workflows, UI state, and deduplication against a prepared local or containerized deployment in ~3 minutes.
+> - **Fresh-Machine Reproduction (Journey B)**: Validates cloning into an empty workspace, creating virtual environments, installing clean dependencies, running builds, and starting services from scratch.
+> - **Local Windows Workstation Execution**: Validates standalone Python 3.11 backend and React 18 Vite SPA development runtimes directly.
+> - **GitHub-Hosted Linux Docker Execution**: Automatically validates multi-container Docker Compose build, health checks, internal bridge networking, and SQLite named volume persistence on `ubuntu-24.04` cloud runners.
 
 ### Supported Prerequisites
 | Component | Supported Version | Notes |

@@ -61,6 +61,7 @@ CloudSentinel AI's architecture separates concerns across five distinct layers:
    - Exposes clean RESTful endpoints:
      - `GET /health`: Fast liveness probe returning `{"status": "ok"}` to verify application process responsiveness (does not independently execute a live SQLite query).
      - `GET /api/metrics`: Queries persisted telemetry samples ordered newest-first.
+     - `POST /api/metrics`: Ingests and persists a single validated telemetry observation into SQLite.
      - `POST /api/demo/generate`: Ingests reproducible synthetic telemetry with controlled anomaly injections.
      - `POST /api/detection/run`: Executes detection algorithms and triggers incident persistence.
      - `GET /api/incidents`: Retrieves persisted incidents with filter support (`service`, `status`, `detector`).

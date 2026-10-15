@@ -32,6 +32,7 @@ flowchart TD
     subgraph Network["REST API Boundary (FastAPI / ASGI Uvicorn :8000)"]
         R_Health["GET /health"]
         R_Metrics["GET /api/metrics"]
+        R_PostMetrics["POST /api/metrics"]
         R_Demo["POST /api/demo/generate"]
         R_Detect["POST /api/detection/run"]
         R_Incidents["GET /api/incidents"]

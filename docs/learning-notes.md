@@ -294,4 +294,40 @@ A critical principle of containerized data safety is distinguishing disposable c
    - Deleting the test volume with `-v` frees runner disk space and prevents runner state pollution.
    - **Crucial Rule**: Never run `docker compose down -v` locally unless an intentional full factory reset is required.
 
+---
+
+## 5. Technical Glossary
+
+A concise engineering reference defining foundational concepts utilized throughout CloudSentinel AI:
+
+| Term | Technical Definition & CloudSentinel AI Context | Practical Example / Formula |
+| :--- | :--- | :--- |
+| **API** *(Application Programming Interface)* | A formal software interface defining how client components request and receive data from services. | In CloudSentinel AI, FastAPI defines the RESTful contract between the React SPA and backend services. |
+| **REST** *(Representational State Transfer)* | A stateless architectural style for web services using standard HTTP methods (`GET`, `POST`) and explicit status codes. | `POST /api/detection/run` triggers detection; `GET /api/incidents` retrieves persisted incident records. |
+| **JSON** *(JavaScript Object Notation)* | A lightweight, human-readable data serialization format using key-value pairs and arrays. | Used across all FastAPI endpoints and for persisting immutable evidence snapshots in SQLite (`observed_metric_evidence`). |
+| **Database** | An organized collection of structured data stored electronically and accessed via a management engine. | Stores telemetry observations and operational incidents on disk. |
+| **Relational Database** | A database organizing data into structured tables with schema constraints, typed columns, primary keys, and ACID guarantees. | CloudSentinel AI defines relational tables (`metric_samples`, `incidents`) with foreign key references and indexes. |
+| **SQLite** | A self-contained, serverless, zero-configuration transactional SQL database engine running in-process. | Persists operational data directly to `backend/data/cloudsentinel.db` with Write-Ahead Logging (`WAL`) mode enabled. |
+| **SQLAlchemy** | An enterprise Python SQL toolkit and Object Relational Mapper (ORM) translating Python classes to relational tables. | Declarative models `MetricSampleModel` and `IncidentModel` define schema fields, indexes, and session lifecycles. |
+| **Telemetry** | Automated digital transmission and collection of operational performance metrics from services. | Time-series observations comprising `latency_ms`, `error_rate`, `cpu_usage_pct`, `memory_usage_pct`, and `request_count`. |
+| **Anomaly** | An observation, pattern, or data point that deviates significantly from established baseline behavior. | An unexpected surge in error rate from normal $<0.01$ up to $0.35$ during a synthetic traffic spike. |
+| **Baseline** | The statistical profile representing normal, steady-state system behavior. | CloudSentinel's synthetic baseline models healthy service traffic with mean latency ~42 ms and error rate $<0.01$. |
+| **Threshold** | A static numerical limit configured by engineering teams beyond which observations are flagged as anomalous. | `latency_ms > 150.0` or `error_rate > 0.05`. Any sample exceeding either boundary triggers a finding. |
+| **Precision** | The proportion of predicted anomaly alerts that are true ground-truth anomalies. Measures alert accuracy. | $\text{Precision} = \frac{\text{TP}}{\text{TP} + \text{FP}}$ (High precision prevents false alarms). |
+| **Recall** | The proportion of actual ground-truth anomalies that were successfully flagged by the detector. Measures coverage. | $\text{Recall} = \frac{\text{TP}}{\text{TP} + \text{FN}}$ (High recall prevents unmonitored outages). |
+| **F1 Score** | The harmonic mean of Precision and Recall, providing a balanced evaluation of detection quality. | $\text{F1} = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}$. Both precision and recall depend directly on $\text{TP}$, $\text{FP}$, and $\text{FN}$ counts. On benchmark: Threshold $F_1 = 1.00$, IsolationForest $F_1 = 0.80$. |
+| **False Positive (FP)** | An alert generated for an observation that is actually healthy/normal (Type I error). | IsolationForest flagged sample index 28 (healthy 31.88 ms latency with 152 requests) due to sparse subspace coordinates. |
+| **False Negative (FN)** | An actual anomaly that the detector failed to identify (Type II error / missed detection). | IsolationForest missed 1 subtle injected anomaly whose coordinates clustered close to the normal training distribution. |
+| **IsolationForest** | An unsupervised ensemble learning algorithm that isolates anomalies by building randomized decision trees. | Anomalies require significantly shorter tree path lengths to isolate than clustered normal points; scored via Scikit-Learn. |
+| **Contamination** | An IsolationForest hyperparameter specifying the expected proportion of outliers in the training dataset. | Configured as `contamination=0.05` ($5\%$), defining the decision score offset boundary separating normal from anomalous samples. |
+| **Docker** | A containerization engine packaging applications and runtime dependencies into lightweight, immutable containers. | Packages the Python 3.11 FastAPI backend and React/Nginx frontend into isolated container environments. |
+| **Docker Compose** | A declarative tool for defining and orchestrating multi-container Docker applications via YAML configurations. | Orchestrates `frontend` and `backend` services on an internal bridge network (`cloudsentinel-network`) via `compose.yaml`. |
+| **Named Volume** | A persistent Docker storage mechanism decoupled from container lifecycles. | Named volume `cloudsentinel-data` mounts to `/app/backend/data`, preserving SQLite database files across container restarts. |
+| **Reverse Proxy** | An intermediate server receiving client traffic and routing requests to appropriate backend services. | Nginx Alpine listens on port 3000, serves SPA static assets, and forwards `/api/` and `/health` requests to FastAPI on port 8000. |
+| **CORS** *(Cross-Origin Resource Sharing)* | A browser security protocol controlling whether scripts on one origin can request resources from a different origin. | Handled via FastAPI's `CORSMiddleware` in local dev; eliminated in Docker production mode via Nginx reverse proxying. |
+| **CI/CD** *(Continuous Integration & Delivery)* | Automated software engineering pipeline building, linting, testing, and verifying code changes on every commit. | Automated multi-job pipeline ensuring regressions are caught before code is merged or released. |
+| **GitHub Actions** | A cloud-native CI/CD automation runner built into GitHub executing declarative workflow jobs on Ubuntu runners. | Executes 3 parallel jobs: `Frontend Lint & Build`, `Backend Tests & ML Evaluation`, and `Docker Compose Integration & Persistence`. |
+| **Idempotence** | An operational property ensuring that executing an action multiple times produces the exact same end state. | Running detection repeatedly against the same telemetry creates 0 duplicate incidents, incrementing `already_existing` counts. |
+| **SHA-256 Fingerprint** | A deterministic cryptographic hash generating a unique 32-byte (64 hex character) digest from an input vector. | CloudSentinel AI hashes `service`, `detector:version`, `config`, `timestamp`, and `sorted_metrics`, storing `service:detector:sha256[:32]` in `dedup_key`. |
+
 
