@@ -271,12 +271,14 @@ CloudSentinel AI runs an automated, multi-job continuous integration pipeline pi
 
 * **Workflow Definition**: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 * **Runner Environment**: `ubuntu-24.04`
-* **Verified CI Workflow Run**: [Run #38740615302 (100% Green, All 3 Jobs Passing)](https://github.com/ARKkhanz/cloudsentinel-ai/actions/runs/38740615302)
+* **Verified CI Workflow Run**: [Run #38743996381 (100% Green, All 3 Jobs Passing)](https://github.com/ARKkhanz/cloudsentinel-ai/actions/runs/38743996381)
 
 ### CI Jobs
-1. **`Frontend Lint & Production Build`** (Node.js 24, `npm ci`, ESLint 10, Vite build): Pass (19s)
-2. **`Backend Unit Tests & ML Evaluation`** (Python 3.11, 114 pytest tests, `evaluate_detectors.py` benchmark): Pass (36s)
-3. **`Docker Compose Integration & Persistence`** (Multi-container build, health probes, synthetic generation, dual detection, deduplication, SQLite named volume persistence): Pass (46s)
+1. **`Frontend Lint & Production Build`** (Node.js 24, `npm ci`, ESLint 10, Vite build): Pass (16s)
+2. **`Backend Unit Tests & ML Evaluation`** (Python 3.11, 114 pytest tests, `evaluate_detectors.py` benchmark): Pass (38s)
+3. **`Docker Compose Integration & Persistence`** (Multi-container build, health probes, synthetic generation, dual detection, deduplication, SQLite named volume persistence): Pass (49s)
+
+> **Browser QA Distinction**: The 13-check automated Google Chrome CDP QA suite was verified locally during Day 4 Milestone 1 (documented in [`docs/day4_milestone1_qa_report.md`](docs/day4_milestone1_qa_report.md)); it is distinct from the 3 automated CI jobs executed in GitHub Actions.
 
 ---
 

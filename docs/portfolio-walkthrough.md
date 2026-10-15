@@ -59,7 +59,7 @@ CloudSentinel AI's architecture separates concerns across five distinct layers:
 3. **Backend Service Layer (FastAPI + Pydantic v2 + Uvicorn)**:
    - Enforces strict Pydantic schemas for request validation, timestamp normalization to UTC, and response serialization.
    - Exposes clean RESTful endpoints:
-     - `GET /health`: Fast liveness and readiness probe checking process status.
+     - `GET /health`: Fast liveness probe returning `{"status": "ok"}` to verify application process responsiveness (does not independently execute a live SQLite query).
      - `GET /api/metrics`: Queries persisted telemetry samples ordered newest-first.
      - `POST /api/demo/generate`: Ingests reproducible synthetic telemetry with controlled anomaly injections.
      - `POST /api/detection/run`: Executes detection algorithms and triggers incident persistence.
@@ -81,7 +81,7 @@ CloudSentinel AI's architecture separates concerns across five distinct layers:
 
 This script provides a structured, numbered walkthrough for presenting CloudSentinel AI in a live technical interview or evaluation demo.
 
-* **Prerequisites**: Application running locally (`http://localhost:5173` frontend / `http://localhost:8000` backend) or via Docker Compose (`http://localhost:3000`).
+* **Prerequisites**: Application running in an isolated, initialized environment locally (`http://localhost:5173` frontend / `http://localhost:8000` backend) or via Docker Compose (`http://localhost:3000`), such as a dedicated clean evaluation instance. The prepared demo steps assume an isolated session and do not overwrite historical operational telemetry.
 
 ---
 
@@ -89,34 +89,35 @@ This script provides a structured, numbered walkthrough for presenting CloudSent
 
 * **Action**: Open browser to [`http://localhost:3000`](http://localhost:3000) (or `http://localhost:5173`).
 * **Presenter Narration**:
-  > *"Here is the CloudSentinel AI dashboard. In the top-right header, we immediately see the live backend health probe reporting a green 'Healthy' status and API latency. Below that, our action bar contains three deterministic operations: generating telemetry, running threshold detection, and running machine learning detection. Currently, our KPI cards show zero active incidents."*
+  > *"Here is the CloudSentinel AI dashboard. In the top-right header, we immediately see the live backend health badge reporting 'Backend: Online (cloudsentinel-backend v0.1.0)'. Below that, our action bar contains three deterministic operations: generating telemetry, running threshold detection, and running machine learning detection. Currently, our KPI cards show zero active incidents."*
 * **What the Evaluator Sees**:
-  - Green `Healthy (200 OK)` badge with timestamp and API URL.
-  - KPI cards: Total Observations, Latency Mean, Error Rate Mean, Active Incidents.
+  - Green `Backend: Online (cloudsentinel-backend v0.1.0)` badge with timestamp and API connectivity.
+  - KPI summary cards: Total Observations, Latency Mean, Error Rate Mean, Active Incidents.
   - Clean layout with zero unhandled exceptions or console errors.
 
 ---
 
 ### Step 2: Ingesting Synthetic Telemetry (0:30 – 1:00)
 
-* **Action**: Click the **"Generate Demo Data"** button.
+* **Action**: Click the **"⚡ Generate Synthetic Data"** button (`id="btn-generate-demo"`).
 * **Presenter Narration**:
-  > *"When I click 'Generate Demo Data', the backend executes our synthetic telemetry generator with Seed 42. It generates a 100-sample time series modeling a microservice API: sinusoidal traffic with Gaussian noise, injected with 3 latency spikes and 2 error rate surges. Note that ground-truth anomaly labels are strictly isolated in memory and never written into metric features or shared with detectors."*
+  > *"When I click '⚡ Generate Synthetic Data', the backend executes our synthetic telemetry generator with Seed 42. It generates a 100-sample time series modeling a microservice API: baseline Gaussian distributions with 3 injected latency spikes (320ms to 520ms) and 2 error rate surges (15% to 35%). Note that ground-truth anomaly labels are strictly isolated in memory and never written into metric features or shared with detectors."*
 * **What the Evaluator Sees**:
-  - Green banner: `Successfully generated 100 metric observations for demo-api.`
+  - Green feedback banner: `Successfully generated and persisted 100 observations with 5 injected anomalies for 'demo-api'.`
   - KPI summary cards update with calculated averages across the generated samples.
-  - Telemetry Table populates with the latest 50 observations showing timestamp, latency (ms), error rate, CPU %, memory %, and request count.
+  - Recent Telemetry Observations table populates with the latest 50 observations showing UTC timestamp, latency (ms), error rate, request count, CPU %, memory %, and synthetic data tags.
 
 ---
 
 ### Step 3: Rule-Based Threshold Detection & Evidence Inspection (1:00 – 1:40)
 
-* **Action**: Click the **"Run Threshold Detection"** button, then click **"View Evidence"** on the first incident.
+* **Action**: Click the **"📊 Run Threshold Detection"** button (`id="btn-run-threshold"`), then click **"View Evidence"** on the first incident.
 * **Presenter Narration**:
   > *"Now I trigger our Threshold Baseline Detector. It evaluates the metric samples against deterministic SLA boundaries: latency greater than 150 milliseconds and error rate greater than 5 percent. It identifies 5 anomalies.
   >
-  > Notice what happens when I open the Forensic Evidence Modal: CloudSentinel AI does not fabricate an ungrounded narrative like 'database deadlock.' Instead, it displays the exact measured values—such as 182.4 milliseconds latency against the 150 millisecond SLA threshold—providing the on-call engineer with mathematical facts."*
+  > Notice what happens when I click 'View Evidence' to open the Forensic Evidence Modal: CloudSentinel AI does not fabricate an ungrounded narrative like 'database deadlock.' Instead, it displays the exact measured values against configured threshold limits—such as observed latency against the 150 millisecond SLA threshold—providing on-call engineers with mathematical facts."*
 * **What the Evaluator Sees**:
+  - Feedback banner: `Threshold Detection completed on 100 samples: 5 findings, 5 new incidents created (0 deduplicated).`
   - Incidents table displays 5 incidents from detector `threshold_baseline`.
   - Severity badges (`CRITICAL` and `WARNING`) based on breach magnitude.
   - Forensic Evidence modal displays observed metric values, threshold limits, delta calculations, and raw JSON payload.
@@ -125,28 +126,28 @@ This script provides a structured, numbered walkthrough for presenting CloudSent
 
 ### Step 4: Multivariate IsolationForest Detection & Tree Isolation (1:40 – 2:15)
 
-* **Action**: Close the modal, click **"Run IsolationForest Detection"**, and open the evidence modal for an ML incident.
+* **Action**: Close the modal, click **"🌲 Run IsolationForest Detection"** (`id="btn-run-ml"`), and click **"View Evidence"** for an ML incident.
 * **Presenter Narration**:
   > *"Next, I execute our unsupervised IsolationForest detector. Unlike threshold rules that check one metric in isolation, this model evaluates a 5-dimensional feature vector—latency, error rate, CPU, memory, and request volume.
   >
-  > In the forensic evidence modal, we see the raw Scikit-Learn decision function score—for example, -0.0011. In tree isolation, negative scores denote points that required fewer random recursive splits to isolate from the baseline distribution. This catches subtle multivariate degradations without needing a human to hand-code complex thresholds."*
+  > In the forensic evidence modal, we see the raw Scikit-Learn decision function score. In tree isolation, negative scores denote points that required fewer random recursive splits to isolate from the baseline distribution. This catches subtle multivariate degradations without needing a human to hand-code complex thresholds."*
 * **What the Evaluator Sees**:
-  - Incidents list increases to 10 total incidents (5 threshold, 5 ML).
+  - Feedback banner: `IsolationForest Detection completed on 100 samples: 5 findings, 5 new incidents created (0 deduplicated).`
+  - Total incident count increases to 10 (5 threshold, 5 ML).
   - Evidence modal shows model metadata: `n_estimators=100`, `contamination=0.05`, `random_state=42`, the 5-feature vector, and the raw decision function score.
 
 ---
 
 ### Step 5: Proving Alert Deduplication & Idempotence (2:15 – 2:40)
 
-* **Action**: Click **"Run Threshold Detection"** again, then click **"Run IsolationForest Detection"** again.
+* **Action**: Click **"📊 Run Threshold Detection"** again, then click **"🌲 Run IsolationForest Detection"** again.
 * **Presenter Narration**:
   > *"In a real operations environment, naive cron-based detectors create dozens of duplicate tickets for the same ongoing incident, causing severe alert fatigue.
   >
   > Notice that when I run both detectors a second time over the same telemetry, the incident count remains exactly 10. The backend computes a deterministic SHA-256 fingerprint over the service, detector, timestamp, and canonicalized metrics. The database enforces a UNIQUE constraint on the dedup_key, ensuring zero duplicate alerts are created."*
 * **What the Evaluator Sees**:
-  - Total incident count remains exactly 10.
-  - Zero duplicate rows in the incident table.
-  - Feedback banner indicates: `Detection completed. 0 new incidents created (already deduplicated).`
+  - Feedback banners report: `0 new incidents created (5 deduplicated).`
+  - Total incident count remains exactly 10 with zero duplicate rows in the incident table.
 
 ---
 
@@ -168,12 +169,12 @@ This script provides a structured, numbered walkthrough for presenting CloudSent
 | Decision | Rationale & Trade-Off | Alternatives Considered |
 | :--- | :--- | :--- |
 | **Dual Detection Paradigms** | Threshold rules provide zero-latency explainable SLA guardrails; IsolationForest identifies non-linear multivariate drift across 5 continuous metrics. | Using ML alone creates explainability issues; using thresholds alone creates multi-variable blind spots. |
-| **Deterministic SHA-256 Fingerprints** | Guarantees idempotent alert creation. Fingerprint includes canonicalized floats and detector version, preventing duplicates while catching metric shifts at identical timestamps. | Relational `SELECT` checks are vulnerable to race conditions; simple timestamp keys ignore metric changes. |
+| **Deterministic SHA-256 Fingerprints** | Guarantees idempotent alert creation for identical observation findings according to implemented fingerprint matching rules. | Relational `SELECT` checks are vulnerable to race conditions; simple timestamp keys ignore metric changes. |
 | **No Ground-Truth Leakage** | In memory, synthetic anomaly flags (`is_anomaly=True`) are isolated strictly for post-detection scoring and never exposed to detector feature vectors. | Embedding ground truth into feature sets causes artificial 100% benchmark accuracy that fails in production. |
 | **Vanilla CSS over Frameworks** | Custom CSS properties and flexbox/grid provide zero runtime overhead, complete styling control, and zero external dependency risk. | TailwindCSS or component libraries introduce build bloat and configuration drift for a focused SPA. |
-| **SQLite with WAL Mode** | Zero external daemon dependencies, self-contained single-file storage, ACID transactions, and sub-millisecond local reads. | PostgreSQL adds multi-container networking complexity and memory overhead unnecessary for a local prototype. |
+| **SQLite with WAL Mode** | Zero external daemon dependencies, self-contained single-file storage, ACID transactions, and low-latency local reads without network overhead. | PostgreSQL adds multi-container networking complexity and memory overhead unnecessary for a local prototype. |
 | **Nginx Reverse Proxy** | Consolidates SPA static asset delivery and API proxying under a single host port (`:3000`), completely eliminating browser CORS configuration issues. | Exposing backend directly to browser requires complex CORS configurations and leaks container topology. |
-| **Multi-Stage Docker Builds** | Multi-stage Node/Nginx build compiles TypeScript into static HTML/JS/CSS, keeping production runtime image size small (~25MB Alpine). | Single-stage Dockerfiles include full Node.js toolchains in production images, increasing security attack surface. |
+| **Multi-Stage Docker Builds** | Multi-stage Node/Nginx build compiles TypeScript into static HTML/JS/CSS, keeping production runtime images lightweight on Alpine Linux. | Single-stage Dockerfiles include full Node.js toolchains in production images, increasing security attack surface. |
 
 ---
 
@@ -186,4 +187,4 @@ To maintain scientific integrity and credibility during engineering evaluations,
 3. **Absence of Outage Forecasting**: Detectors identify anomalous states in *already-observed* metrics; they do not forecast future failures before they occur.
 4. **No Root-Cause Diagnosis**: The platform highlights factual statistical breaches. It does not speculate or assert root cause (e.g. diagnosing a thread deadlock or network partition).
 5. **No Destructive Automated Remediation**: The platform is an observability and triage aid; it intentionally does not execute automated server restarts, auto-scaling, or rollbacks.
-6. **Concurrency Scope**: SQLite is configured for single-writer concurrency with WAL mode. It is designed for single-node prototype evaluation, not enterprise high-concurrency write ingestion (e.g. >10,000 writes/sec).
+6. **Concurrency Scope**: SQLite is configured for single-writer concurrency with WAL mode. It is designed for single-node prototype evaluation, not enterprise high-concurrency distributed write workloads.

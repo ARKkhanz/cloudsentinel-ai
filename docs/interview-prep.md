@@ -11,7 +11,7 @@
 "In distributed systems observability, on-call engineers face two primary pain points: **alert fatigue** caused by continuous duplicate notifications during active incidents, and **opaque black-box alerts** that notify developers of an anomaly without providing transparent, verifiable evidence.
 
 CloudSentinel AI addresses both problems directly:
-1. It implements a **deterministic SHA-256 deduplication engine** that fingerprints the service, detector configuration, timestamp, and numerical telemetry readings, guaranteeing that repeated detector runs over an ongoing issue create zero duplicate alert records.
+1. It implements a **deterministic SHA-256 deduplication engine** that fingerprints the service, detector configuration, timestamp, and numerical telemetry readings, ensuring that repeated detector runs over identical observation findings create zero duplicate alert records according to the implemented fingerprint matching rules.
 2. It provides **factual evidence chains**—storing exact measured metrics against configured SLA limits for threshold breaches, or raw tree isolation decision scores for machine learning detections—giving engineers immediate, mathematical context without fabricating speculative root-cause narratives."
 
 ---
@@ -27,7 +27,7 @@ CloudSentinel AI addresses both problems directly:
 
 ### Q3: Why did you choose SQLite over PostgreSQL for persistence, and what are the trade-offs?
 **Answer**:
-"For an evaluation prototype, SQLite was chosen because it is self-contained, requires zero external daemon processes, eliminates database network configuration overhead, and offers sub-millisecond local read latency. We run SQLite with Write-Ahead Logging (`WAL` mode) and foreign key enforcement enabled via SQLAlchemy 2.x event listeners.
+"For an evaluation prototype, SQLite was chosen because it is self-contained, requires zero external daemon processes, eliminates database network configuration overhead, and offers low-latency local reads without network overhead. We run SQLite with Write-Ahead Logging (`WAL` mode) and foreign key enforcement enabled via SQLAlchemy 2.x event listeners.
 
 **Trade-offs**:
 - *Advantage*: Rapid local reproducibility, zero Docker setup complexity, and simple backup via single-file volume mounting (`cloudsentinel-data`).
@@ -37,12 +37,12 @@ CloudSentinel AI addresses both problems directly:
 
 ### Q4: How is synthetic telemetry generated, and how do you ensure reproducibility?
 **Answer**:
-"Telemetry generation (`backend/app/services/anomaly_generator.py`) produces realistic microservice metrics using mathematical distributions rather than random numbers. It combines:
-1. A **diurnal sinusoidal curve** to model periodic daily request volume.
-2. **Gaussian noise** ($\mu=42\text{ms}, \sigma=5\text{ms}$ for latency; $\mu=0.5\%, \sigma=0.2\%$ for error rate) to simulate normal operational variance.
-3. **Controlled anomaly injections** (3 latency spikes up to $180\text{ms}$ and 2 error rate surges up to $8\%$).
-
-Reproducibility is guaranteed by using an explicit NumPy random generator seeded with `Seed 42` for evaluation data and `Seed 100` for baseline training data. Given the same seed, the generator produces bit-for-bit identical time-series arrays across any environment."
+"Telemetry generation (`backend/app/services/anomaly_generator.py`) produces realistic microservice metrics with controlled injected anomalies. It combines:
+1. **Baseline Gaussian distributions** to simulate normal operational variance ($\mu=42\text{ms}, \sigma=5\text{ms}$ for latency; $\mu=0.5\%, \sigma=0.2\%$ for error rate; $\mu=130, \sigma=15$ for request counts; $\mu=28\%, \sigma=3.5\%$ for CPU; and $\mu=44\%, \sigma=2\%$ for memory).
+2. **Controlled anomaly injections**:
+   - **Latency spikes**: 3 injected spikes with latency values between 320 and 520 ms (along with elevated CPU between 70% and 92%).
+   - **Error-rate surges**: 2 injected spikes with error rates between 15% and 35% (0.15 to 0.35).
+3. **Deterministic generation**: Uses an isolated Python standard library `random.Random(seed)` instance (seeded with `Seed 42` for evaluation data and `Seed 100` for baseline training data) rather than global RNG state. This ensures deterministic, reproducible telemetry generation within the test and demo suites."
 
 ---
 
@@ -80,7 +80,7 @@ Furthermore, ground-truth labels (`is_anomaly=True`) are isolated strictly for c
 ### Q8: Why did the Threshold Detector achieve F1=1.00 on your benchmark while IsolationForest achieved F1=0.80?
 **Answer**:
 "This outcome reflects the design of the synthetic benchmark, not an inherent superiority of threshold rules:
-1. In the synthetic dataset, all 5 injected anomalies were intentionally modeled as large spikes ($180\text{ms}$ latency and $8\%$ error rate) specifically designed to test SLA boundary tripwires. Because these magnitudes comfortably exceeded the static thresholds ($150\text{ms}$ and $5\%$), the threshold detector caught all 5 with 0 false positives ($F_1 = 1.00$).
+1. In the synthetic dataset, all 5 injected anomalies were intentionally modeled as distinct spikes (latency spikes between 320 and 520 ms and error-rate surges between 15% and 35%) specifically designed to test SLA boundary tripwires. Because these magnitudes comfortably exceeded the static thresholds ($150\text{ms}$ and $5\%$), the threshold detector caught all 5 with 0 false positives ($F_1 = 1.00$).
 2. The IsolationForest detector evaluated a 5-dimensional continuous space (`latency_ms`, `error_rate`, `cpu_usage_pct`, `memory_usage_pct`, `request_count`) without knowledge of manual thresholds. It caught 4 out of 5 true positives, but flagged 1 borderline normal point (1 false positive) and missed 1 anomaly whose multi-metric footprint was close to the boundary (1 false negative), resulting in Precision: `0.80`, Recall: `0.80`, and $F_1 = 0.80$.
 
 In production, threshold rules fail when degradations occur across multi-variable combinations where no single metric breaches a static limit. IsolationForest excels at capturing those subtle multi-metric correlations."
@@ -108,7 +108,7 @@ CloudSentinel AI computes a deterministic fingerprint across six canonical eleme
 5. ISO-8601 UTC observation `timestamp`
 6. Canonical sorted JSON tuple of measured numerical metrics
 
-We hash this string using SHA-256 and store the first 32 characters as `service:detector:sha256[:32]` in the `dedup_key` column, which has a `UNIQUE` index in SQLite. When a detector is triggered repeatedly, duplicate inserts collide with this constraint. The incident service catches the integrity constraint or performs an idempotent check, returning the existing incident without creating duplicates."
+We hash this string using SHA-256 and store the first 32 characters as `service:detector:sha256[:32]` in the `dedup_key` column, which has a `UNIQUE` index in SQLite. When a detector is triggered repeatedly over identical observations, duplicate inserts collide with this constraint according to the implemented fingerprint matching rules. The incident service catches the integrity constraint or performs an idempotent check, returning the existing incident without creating duplicates."
 
 ---
 
@@ -162,7 +162,7 @@ We set directory ownership of `/app/backend/data` to `cloudsentinel:appgroup` an
 **What Remains Untested**:
 - Multi-node clustering across physical networks.
 - Long-term continuous concept drift over weeks of execution.
-- High-concurrency load testing (>5,000 requests/sec).
+- High-concurrency production load testing.
 - Public TLS certificate provisioning."
 
 ---
