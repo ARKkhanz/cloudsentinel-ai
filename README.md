@@ -109,13 +109,16 @@ The FastAPI backend exposes 7 fully implemented, verified endpoints:
 
 | Method | Endpoint | Purpose | Expected Inputs | Response Behavior | Persistence (DB) |
 | :--- | :--- | :--- | :--- | :--- | :---: |
-| `GET` | `/health` | Process liveness probe | None | HTTP 200: `{"status": "ok", "service": "cloudsentinel-backend", "version": "0.1.0", "database": "connected"}` | Read-only |
+| `GET` | `/health` | Application process liveness probe | None | HTTP 200: `{"status": "ok", "service": "cloudsentinel-backend", "version": "0.1.0", "database": "connected"}` | Read-only |
 | `GET` | `/api/metrics` | Retrieve persisted telemetry observations | Query: `service: str = "demo-api"`, `limit: int = 50` (1..200) | HTTP 200: `MetricListResponse` (ordered newest-first) | Read-only |
 | `POST` | `/api/metrics` | Ingest and persist a single validated telemetry observation | Body: `MetricSampleCreate` (JSON) | HTTP 201: `MetricSample` with database ID; invalid bounds rejected with HTTP 422 | **Write** (`metric_samples`) |
 | `POST` | `/api/demo/generate` | Generate and persist reproducible synthetic telemetry | Body: `DemoGenerateRequest` (`count=100`, `seed=42`, `service="demo-api"`) | HTTP 201: `DemoGenerateResponse` (summary of generated samples & injected anomalies) | **Write** (`metric_samples`) |
 | `POST` | `/api/detection/run` | Execute detector on telemetry & persist deduplicated incidents | Body: `DetectionRunRequest` (`detector="threshold_baseline" \| "isolation_forest"`, `service="demo-api"`, `limit=100`) | HTTP 200: `DetectionRunResponse` (findings, incidents created, duplicates suppressed) | **Write** (`incidents`) |
 | `GET` | `/api/incidents` | List persisted incidents with optional filtering | Query: `service: Optional[str]`, `detector: Optional[str]`, `status: Optional[str]`, `limit: int = 50` | HTTP 200: `IncidentListResponse` (ordered newest-first) | Read-only |
 | `GET` | `/api/incidents/{id}` | Retrieve forensic evidence snapshot for specific incident | Path: `id: str` (UUID) | HTTP 200: `IncidentDetailResponse` (evidence snapshot, decision scores); HTTP 404 if not found | Read-only |
+
+> [!NOTE]
+> **Health Check Truthfulness**: `GET /health` acts as a fast process liveness check verifying application process and HTTP routing responsiveness. Although the `HealthResponse` schema includes `"database": "connected"` by default, the endpoint does not independently execute a live SQL connectivity test against SQLite. Live database operational readiness is proven by executing queries against `GET /api/metrics` or `POST /api/demo/generate`.
 
 ### Telemetry Ingestion Payload Example (`POST /api/metrics`)
 ```json

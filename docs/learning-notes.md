@@ -232,7 +232,8 @@ Empirical evaluation demonstrated key operational trade-offs:
 | **Pytest Backend Suite** | 8 test modules (Health, Metrics, Persistence, Demo Gen, Threshold, ML, Incidents, Evaluation) | **114 passed, 0 failed** | ~13.1s |
 | **Frontend Production Build** | TypeScript compiler check (`tsc -b`) & Vite bundler | **Pass** (0 errors) | ~1.0s |
 | **Reproducible ML Benchmark** | Standalone benchmark runner (`backend/scripts/evaluate_detectors.py`) | **Reproduced** (100 samples) | ~0.6s |
-| **Real Chrome Browser QA** | 11 automated CDP steps (Connection, Generation, Threshold, ML, Evidence, Dedup, Persistence, Mobile) | **11 passed, 0 failed** | ~24s |
+| **Chrome Browser QA (Day 4 Final)** | 13 automated CDP steps (including database safety preflight and negative test proofs; documented in [`docs/day4_milestone1_qa_report.md`](day4_milestone1_qa_report.md)) | **13 passed, 0 failed** | ~28s |
+| *Historical Chrome QA (Day 2 Milestone 6)* | *11 automated CDP steps (preliminary verification of core UI flows)* | *11 passed, 0 failed* | *~24s* |
 | **GitHub Actions CI (All 3 Jobs)** | Backend pytest (114), Frontend ESLint/Vite, Docker Compose multi-container integration & persistence | **100% Green** | ~1m 40s |
 
 ---
@@ -244,7 +245,7 @@ Continuous Integration is the automated engineering practice of validating every
 
 ### 4.2 GitHub Actions Architecture: Workflows, Jobs, and Steps
 - **Workflow** (`.github/workflows/ci.yml`): The top-level automated process defined in YAML, triggered by events (`push`, `pull_request`, `workflow_dispatch`).
-- **Jobs** (`backend-tests`, `frontend-checks`, `docker-integration`): Parallel execution units running on independent, fresh `ubuntu-latest` virtual machines.
+- **Jobs** (`backend-tests`, `frontend-checks`, `docker-integration`): Parallel execution units running on independent, fresh `ubuntu-24.04` virtual machines.
 - **Steps**: Sequential tasks inside a job executing individual commands (checkout, setup-python, npm ci, docker compose up).
 
 ### 4.3 Why Hosted Cloud Runners Solve Local Toolchain Constraints
